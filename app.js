@@ -165,7 +165,7 @@ function initStarField() {
 
   function generateConstellationInZone([x0, y0, x1, y1]) {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const exclPx = Math.min(340, Math.min(vw, vh) * 0.28);
+    const exclPx = Math.min(340, Math.min(vw, vh) * 0.40);
 
     const pw = x1 - x0, ph = y1 - y0;
     const ix0 = x0 + pw * 0.12, ix1 = x1 - pw * 0.12;
@@ -511,8 +511,10 @@ function initStarField() {
 
   window.addEventListener('resize', () => { if (active) resize(); });
 
-  document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
-  document.addEventListener('mouseleave', () => { mouseX = -1; mouseY = -1; });
+  document.addEventListener('pointermove',  e => { mouseX = e.clientX; mouseY = e.clientY; });
+  document.addEventListener('pointerleave', () => { mouseX = -1; mouseY = -1; });
+  document.addEventListener('pointerdown',  e => { mouseX = e.clientX; mouseY = e.clientY; });
+  document.addEventListener('pointerup',    () => { mouseX = -1; mouseY = -1; });
 
   start();
 }

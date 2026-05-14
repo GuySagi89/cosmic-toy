@@ -29,14 +29,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
 }
 
 /* ── Globe canvas ── */
 #globe-canvas {
   display: block;
-  width: 500px;
-  height: 500px;
+  width:  min(500px, 90vmin);
+  height: min(500px, 90vmin);
   cursor: grab;
+  touch-action: none;
   filter:
     drop-shadow(0 0 18px rgba(130, 50, 240, 0.50))
     drop-shadow(0 0 48px rgba(80,  20, 180, 0.25));

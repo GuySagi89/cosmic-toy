@@ -505,7 +505,7 @@
     canvas.width  = W;
     canvas.height = H;
 
-    canvas.addEventListener('mousemove', e => {
+    canvas.addEventListener('pointermove', e => {
       if (e.buttons === 0 && dragVertex)  onRelease();
       if (e.buttons === 0 && moonDragging) releaseMoon();
       const { x, y } = canvasCoords(e, canvas);
@@ -521,14 +521,14 @@
       mouseY = y;
     });
 
-    canvas.addEventListener('mouseenter', () => { mouseInside = true; });
-    canvas.addEventListener('mouseleave', () => {
+    canvas.addEventListener('pointerenter', () => { mouseInside = true; });
+    canvas.addEventListener('pointerleave', () => {
       mouseInside = false;
       if (!dragVertex && !moonDragging) { mouseX = -9999; mouseY = -9999; }
       releaseMoon();
     });
 
-    canvas.addEventListener('mousedown', e => {
+    canvas.addEventListener('pointerdown', e => {
       const { x, y } = canvasCoords(e, canvas);
 
       // Moon grab takes priority — check it first
@@ -538,11 +538,14 @@
         moonDragging = true;
         moonDragVel  = 0;
         canvas.style.cursor = 'grabbing';
+        canvas.setPointerCapture(e.pointerId);
         return;
       }
 
-      // Otherwise try to grab a globe vertex
-      let nearest = null, bestDist = GRAB_RADIUS;
+      // Otherwise try to grab a globe vertex.
+      // Use a larger radius for touch so a fingertip reliably hits something.
+      const effectiveGrabRadius = e.pointerType === 'touch' ? 50 : GRAB_RADIUS;
+      let nearest = null, bestDist = effectiveGrabRadius;
       for (let i = 0; i < vertices.length; i++) {
         const v = vertices[i];
         if (v._rz >= 0) continue; // skip back hemisphere
@@ -554,6 +557,7 @@
         computeDragWeights(nearest);
         canvas.style.cursor = 'grabbing';
       }
+      canvas.setPointerCapture(e.pointerId);
     });
 
     function releaseMoon() {
@@ -593,7 +597,7 @@
       if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
     }
 
-    window.addEventListener('mouseup', () => { onRelease(); releaseMoon(); });
+    window.addEventListener('pointerup', () => { onRelease(); releaseMoon(); });
 
     generateVertices();
     requestAnimationFrame(tick);
