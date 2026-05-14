@@ -395,6 +395,7 @@
     if (blackHole) {
       blackHole.age = blackHole.maxAge * 0.92;
       if (!blackHole.explodeFired) {
+        triggerShipExplosion();
         window.dispatchEvent(new CustomEvent('blackhole-explode', { detail: { x: blackHole.x, y: blackHole.y } }));
         blackHole.explodeFired = true;
       }
@@ -622,7 +623,6 @@
       while (spaceship.emitAccum >= 1) { emitSmoke(); spaceship.emitAccum--; }
     }
 
-    // Fade and destroy once released
     if (!spaceship.active) {
       spaceship.alpha = Math.max(0, spaceship.alpha - dt * 1.3);
       if (spaceship.alpha <= 0) { spaceship = null; return; }
@@ -669,6 +669,35 @@
   function drawSpaceship() {
     if (!spaceship) return;
     ctx.save();
+
+    if (spaceship.exploding) {
+      const prog    = spaceship.explodeAge / spaceship.explodeMaxAge;
+      const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+      const flashPeak = Math.sin(prog * Math.PI);
+      if (flashPeak > 0.01) {
+        const flash = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 68);
+        flash.addColorStop(0,    `rgba(255, 248, 255, ${flashPeak * 0.92})`);
+        flash.addColorStop(0.10, `rgba(225, 185, 255, ${flashPeak * 0.58})`);
+        flash.addColorStop(0.38, `rgba(145,  95, 255, ${flashPeak * 0.24})`);
+        flash.addColorStop(1,    'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = flash;
+        ctx.beginPath();
+        ctx.arc(spaceship.x, spaceship.y, 68, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const waveR = easeOut(prog) * 92;
+      ctx.beginPath();
+      ctx.arc(spaceship.x, spaceship.y, waveR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(220, 192, 255, ${(1 - prog) * 0.88})`;
+      ctx.lineWidth   = 3.5 * (1 - prog) + 0.4;
+      ctx.shadowColor = 'rgba(200, 170, 255, 1)';
+      ctx.shadowBlur  = 22;
+      ctx.stroke();
+      ctx.shadowBlur  = 0;
+    }
+
     ctx.globalAlpha = spaceship.alpha;
     ctx.translate(spaceship.x, spaceship.y);
     ctx.rotate(spaceship.angle);
@@ -724,6 +753,29 @@
   window.releaseSpaceship = function() {
     if (spaceship) spaceship.active = false;
   };
+
+  function triggerShipExplosion() {
+    if (!spaceship || spaceship.exploding) return;
+    spaceship.active        = false;
+    spaceship.exploding     = true;
+    spaceship.explodeAge    = 0;
+    spaceship.explodeMaxAge = 1.1;
+    const count = 26;
+    for (let i = 0; i < count; i++) {
+      const angle   = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.45;
+      const speed   = 90 + Math.random() * 200;
+      const maxLife = 0.55 + Math.random() * 0.55;
+      smokeParticles.push({
+        x: spaceship.x + (Math.random() - 0.5) * 10,
+        y: spaceship.y + (Math.random() - 0.5) * 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: maxLife, maxLife,
+        r: 3 + Math.random() * 4.5,
+        core: Math.random() < 0.55,
+      });
+    }
+  }
 
   function draw(timestamp) {
     const dt = lastTimestamp === null ? 1 / 60 : Math.min(0.1, (timestamp - lastTimestamp) / 1000);
@@ -850,9 +902,8 @@
       blackHole.rotation += dt * 2.8; // faster vortex; (rs/d)² exponent keeps inner much faster
       drawBlackHole(blackHole);
       if (!blackHole.explodeFired && blackHole.age / blackHole.maxAge > 0.92) {
-        window.dispatchEvent(new CustomEvent('blackhole-explode', {
-          detail: { x: blackHole.x, y: blackHole.y }
-        }));
+        triggerShipExplosion();
+        window.dispatchEvent(new CustomEvent('blackhole-explode', { detail: { x: blackHole.x, y: blackHole.y } }));
         blackHole.explodeFired = true;
       }
       if (blackHole.age >= blackHole.maxAge) blackHole = null;
@@ -958,15 +1009,17 @@
   let ghost     = null;
   let gadgetType = null;
 
-  function cancelDrag() {
+  function cancelDrag(slot) {
     if (ghost) { ghost.remove(); ghost = null; }
     if (gadgetType === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
     gadgetType = null;
+    if (slot) slot.classList.add('no-tooltip');
   }
 
   inventory.querySelectorAll('.gadget-slot').forEach(slot => {
     slot.addEventListener('pointerdown', e => {
       e.stopPropagation();
+      slot.classList.add('no-tooltip');
       gadgetType = slot.dataset.gadget;
 
       if (gadgetType === 'blackhole') {
@@ -1003,8 +1056,14 @@
         window.releaseSpaceship && window.releaseSpaceship();
       }
       gadgetType = null;
+      slot.classList.add('no-tooltip');
     });
 
-    slot.addEventListener('pointercancel', cancelDrag);
+    slot.addEventListener('pointercancel', () => cancelDrag(slot));
+
+    // Re-enable tooltip only when pointer genuinely re-enters the slot
+    slot.addEventListener('pointerenter', () => {
+      if (!gadgetType) slot.classList.remove('no-tooltip');
+    });
   });
 })();
