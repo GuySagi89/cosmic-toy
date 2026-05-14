@@ -106,35 +106,55 @@ function initStarField() {
     return edges;
   }
 
-  // Add one closing edge to the chain to create a loop, while ensuring at least
-  // one open tail remains.  Prefers closing two interior nodes (both ends stay
-  // as tails).  Skips the edge that would close the two chain endpoints (full
-  // cycle = no tail at all).  Falls back to leaving the chain open if no valid
-  // non-crossing, non-endpoint-closing edge exists.
+  // Add one closing edge to the chain to create a loop with an open tail.
+  // Rules (all must hold for a candidate closing edge between chain positions i and j):
+  //   1. Not the two chain endpoints — that would make a fully closed loop.
+  //   2. No crossing with existing edges.
+  //   3. Any tail nodes (the stars just outside i and j in the chain) must lie on
+  //      the EXTERIOR side of the closing edge, not the interior (loop) side.
+  //      This is the fix for tails "going into" the closed shape.
   function addTailLoop(pts, chainEdges) {
-    if (chainEdges.length < 3) return [...chainEdges]; // too short to loop + tail
+    if (chainEdges.length < 3) return [...chainEdges];
 
-    // Reconstruct the ordered sequence of pts indices along the chain.
     const order = [chainEdges[0][0], ...chainEdges.map(e => e[1])];
     const n = order.length;
 
     const candidates = [];
     for (let i = 0; i < n - 2; i++) {
       for (let j = i + 2; j < n; j++) {
-        if (i === 0 && j === n - 1) continue; // would close full loop — no tail
+        if (i === 0 && j === n - 1) continue; // full closure — no tail
+
         const pi = order[i], pj = order[j];
-        if (chainEdges.every(([u, v]) => !segsCross(pts, pi, pj, u, v))) {
-          const bothInterior = i > 0 && j < n - 1;
-          const d = Math.hypot(pts[pi][0] - pts[pj][0], pts[pi][1] - pts[pj][1]);
-          candidates.push({ pi, pj, d, bothInterior });
+        if (!chainEdges.every(([u, v]) => !segsCross(pts, pi, pj, u, v))) continue;
+
+        // Determine which side of the closing edge the loop body lies on.
+        // Use the midpoint of the loop path as a "witness" for the interior.
+        const [ax, ay] = pts[pi], [bx, by] = pts[pj];
+        const midIdx = order[Math.floor((i + j) / 2)];
+        const [mx, my] = pts[midIdx];
+        const loopSide = cross2D(bx - ax, by - ay, mx - ax, my - ay);
+        if (loopSide === 0) continue; // degenerate collinear — skip
+
+        // Reject if any tail node is on the same side as the loop interior.
+        let ok = true;
+        if (i > 0) {
+          const [tx, ty] = pts[order[i - 1]];
+          if (cross2D(bx - ax, by - ay, tx - ax, ty - ay) * loopSide > 0) ok = false;
         }
+        if (ok && j < n - 1) {
+          const [tx, ty] = pts[order[j + 1]];
+          if (cross2D(bx - ax, by - ay, tx - ax, ty - ay) * loopSide > 0) ok = false;
+        }
+        if (!ok) continue;
+
+        const bothInterior = i > 0 && j < n - 1;
+        const d = Math.hypot(pts[pi][0] - pts[pj][0], pts[pi][1] - pts[pj][1]);
+        candidates.push({ pi, pj, d, bothInterior });
       }
     }
 
-    if (candidates.length === 0) return [...chainEdges];
+    if (candidates.length === 0) return [...chainEdges]; // fall back to open chain
 
-    // Prefer closing between two interior nodes (keeps a tail at each end);
-    // among equals pick the shortest edge.
     candidates.sort((a, b) =>
       a.bothInterior !== b.bothInterior ? (a.bothInterior ? -1 : 1) : a.d - b.d
     );
