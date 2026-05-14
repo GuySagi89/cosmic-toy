@@ -1,6 +1,6 @@
 // ── Star field ──────────────────────────────────────────────────
 
-function initStarField() {
+(function () {
   const canvas = document.getElementById('stars-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -44,14 +44,18 @@ function initStarField() {
     'The Magnificent Kerfuffle',
   ];
 
-  // ── Zone-based constellation generation ──────────────────────────────────
-  // Screen is divided into a strict 3×2 grid of non-overlapping zones.
-  // Each session picks 5 of 6 zones and grows one constellation per zone.
-  // Stars are placed randomly inside each zone's inner area so that edges
-  // (which connect only stars inside a convex rectangle) can never leave the
-  // zone — guaranteeing no overlap or line crossing between constellations.
-  // Within a constellation a non-crossing spanning tree is computed via
-  // Prim's nearest-neighbour with a segment-intersection guard.
+  // ── Constellation geometry constants ─────────────────────────────────────────
+  const ZONE_PAD_X       = 0.12;  // horizontal inner-margin as fraction of zone width
+  const ZONE_PAD_Y       = 0.10;  // vertical inner-margin as fraction of zone height
+  const CLUSTER_R_MIN    = 0.055; // minimum cluster radius (fraction of min screen dimension)
+  const CLUSTER_R_RNG    = 0.055; // random range added to CLUSTER_R_MIN
+  const CLUSTER_TRIES    = 150;   // max attempts to find a valid cluster centre
+  const MIN_STAR_SEP     = 0.022; // minimum separation between stars (fraction of screen)
+  const STAR_CNT_MIN     = 4;     // fewest stars per constellation
+  const STAR_CNT_RNG     = 4;     // added random count — gives range 4–7
+  const BG_STAR_COUNT    = 210;   // non-constellation background stars
+  const EXCL_RADIUS_MAX  = 340;   // hard cap on globe exclusion zone (px)
+  const EXCL_RADIUS_FRAC = 0.40;  // exclusion zone as fraction of min screen dimension
 
   // 3×2 grid — tablet/desktop
   const ZONES = [
@@ -87,9 +91,6 @@ function initStarField() {
            ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
   }
 
-  // Nearest-neighbour open chain: walk star-to-star always picking the closest
-  // unvisited neighbour that doesn't cross an existing edge and isn't too far away.
-  // Result is a simple path — drawable in one stroke with no retracing.
   function buildNonCrossingChain(pts, maxEdge = Infinity) {
     if (pts.length <= 1) return [];
     const visited = new Set([0]);
@@ -106,7 +107,7 @@ function initStarField() {
           bestDist = d; bestNext = b;
         }
       }
-      if (bestNext === -1) break; // no reachable neighbour — stop here
+      if (bestNext === -1) break;
       edges.push([current, bestNext]);
       visited.add(bestNext);
       current = bestNext;
@@ -115,13 +116,9 @@ function initStarField() {
     return edges;
   }
 
-  // Add one closing edge to the chain to create a loop with an open tail.
-  // Rules (all must hold for a candidate closing edge between chain positions i and j):
-  //   1. Not the two chain endpoints — that would make a fully closed loop.
-  //   2. No crossing with existing edges.
-  //   3. Any tail nodes (the stars just outside i and j in the chain) must lie on
-  //      the EXTERIOR side of the closing edge, not the interior (loop) side.
-  //      This is the fix for tails "going into" the closed shape.
+  // Add one closing edge to create a loop with an open tail.
+  // Tail nodes must lie on the EXTERIOR side of the closing edge — prevents
+  // tails from visually entering the closed shape.
   function addTailLoop(pts, chainEdges) {
     if (chainEdges.length < 3) return [...chainEdges];
 
@@ -136,15 +133,12 @@ function initStarField() {
         const pi = order[i], pj = order[j];
         if (!chainEdges.every(([u, v]) => !segsCross(pts, pi, pj, u, v))) continue;
 
-        // Determine which side of the closing edge the loop body lies on.
-        // Use the midpoint of the loop path as a "witness" for the interior.
         const [ax, ay] = pts[pi], [bx, by] = pts[pj];
         const midIdx = order[Math.floor((i + j) / 2)];
         const [mx, my] = pts[midIdx];
         const loopSide = cross2D(bx - ax, by - ay, mx - ax, my - ay);
-        if (loopSide === 0) continue; // degenerate collinear — skip
+        if (loopSide === 0) continue;
 
-        // Reject if any tail node is on the same side as the loop interior.
         let ok = true;
         if (i > 0) {
           const [tx, ty] = pts[order[i - 1]];
@@ -162,7 +156,7 @@ function initStarField() {
       }
     }
 
-    if (candidates.length === 0) return [...chainEdges]; // fall back to open chain
+    if (candidates.length === 0) return [...chainEdges];
 
     candidates.sort((a, b) =>
       a.bothInterior !== b.bothInterior ? (a.bothInterior ? -1 : 1) : a.d - b.d
@@ -174,33 +168,32 @@ function initStarField() {
 
   function generateConstellationInZone([x0, y0, x1, y1]) {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const exclPx = Math.min(340, Math.min(vw, vh) * 0.40);
+    const exclPx = Math.min(EXCL_RADIUS_MAX, Math.min(vw, vh) * EXCL_RADIUS_FRAC);
 
     const pw = x1 - x0, ph = y1 - y0;
-    const ix0 = x0 + pw * 0.12, ix1 = x1 - pw * 0.12;
-    const iy0 = y0 + ph * 0.10, iy1 = y1 - ph * 0.10;
+    const ix0 = x0 + pw * ZONE_PAD_X, ix1 = x1 - pw * ZONE_PAD_X;
+    const iy0 = y0 + ph * ZONE_PAD_Y, iy1 = y1 - ph * ZONE_PAD_Y;
 
-    const clusterR = 0.055 + Math.random() * 0.055; // 5.5–11 % of screen width
+    const clusterR = CLUSTER_R_MIN + Math.random() * CLUSTER_R_RNG;
     let clusterX, clusterY, centerFound = false;
-    for (let a = 0; a < 150; a++) {
+    for (let a = 0; a < CLUSTER_TRIES; a++) {
       const cx = ix0 + Math.random() * (ix1 - ix0);
       const cy = iy0 + Math.random() * (iy1 - iy0);
       const dx = (cx - 0.5) * vw, dy = (cy - 0.5) * vh;
-      if (Math.hypot(dx, dy) >= exclPx + clusterR * Math.max(vw, vh)) {
+      if (Math.hypot(dx, dy) >= exclPx + clusterR * Math.min(vw, vh)) {
         clusterX = cx; clusterY = cy; centerFound = true; break;
       }
     }
     if (!centerFound) return null;
 
-    // Random start point inside the cluster — chain begins wherever, feels less mechanical
     const startAngle = Math.random() * Math.PI * 2;
     const startR     = clusterR * 0.3 + Math.random() * clusterR * 0.7;
     const pts = [[
       Math.max(ix0, Math.min(ix1, clusterX + Math.cos(startAngle) * startR)),
       Math.max(iy0, Math.min(iy1, clusterY + Math.sin(startAngle) * startR)),
     ]];
-    const MIN_D = 0.022;
-    const starCount = 4 + Math.floor(Math.random() * 4); // 4–7 stars
+
+    const starCount = STAR_CNT_MIN + Math.floor(Math.random() * STAR_CNT_RNG);
 
     for (let attempts = 0; pts.length < starCount && attempts < 500; attempts++) {
       const angle = Math.random() * Math.PI * 2;
@@ -210,7 +203,7 @@ function initStarField() {
       if (x < ix0 || x > ix1 || y < iy0 || y > iy1) continue;
       const dx = (x - 0.5) * vw, dy = (y - 0.5) * vh;
       if (Math.hypot(dx, dy) < exclPx) continue;
-      if (pts.every(([px, py]) => Math.hypot(x - px, y - py) >= MIN_D)) {
+      if (pts.every(([px, py]) => Math.hypot(x - px, y - py) >= MIN_STAR_SEP)) {
         pts.push([x, y]);
       }
     }
@@ -224,9 +217,6 @@ function initStarField() {
 
   function generateSessionDefs() {
     const vmin = Math.min(window.innerWidth, window.innerHeight);
-    // mobile: 2×2 grid, 3 constellations — less clutter on small screens
-    // widescreen: all 6 zones — fills the extra sky on large monitors
-    // default: 3×2 grid, 5 constellations
     const zones = vmin < 600 ? ZONES_MOBILE : ZONES;
     const count = vmin < 600 ? 3 : vmin >= 900 ? 6 : 5;
 
@@ -238,17 +228,10 @@ function initStarField() {
     }
     return defs;
   }
-  const sessionDefs = generateSessionDefs();
 
-  const sessionNames = (() => {
-    const names = SILLY_NAMES.slice().sort(() => Math.random() - 0.5);
-    // ~5 % chance per session that one constellation is the rare Yashi Pozmantiria
-    if (Math.random() < 0.05) names[Math.floor(Math.random() * 5)] = 'Yashi Pozmantiria';
-    return names;
-  })();
-
-  let stars = [], constellations = [], shooting = null;
-  let rafId = null, shootTimer = null, active = false, t = 0;
+  let sessionDefs, sessionNames;
+  let bgStars = [], conStars = [], constellations = [], shooting = null;
+  let rafId = null, shootTimer = null, active = false, t = 0, lastTimestamp = null;
   let bgGrad = null, neb1 = null, neb2 = null, neb3 = null;
   let mouseX = -1, mouseY = -1;
 
@@ -288,7 +271,7 @@ function initStarField() {
   }
 
   function buildStars() {
-    stars = Array.from({ length: 210 }, () => ({
+    bgStars = Array.from({ length: BG_STAR_COUNT }, () => ({
       x:     Math.random() * canvas.width,
       y:     Math.random() * canvas.height,
       r:     Math.random() ** 1.4 * 1.7 + 0.3,
@@ -299,10 +282,11 @@ function initStarField() {
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
     }));
 
+    conStars = [];
     constellations = sessionDefs.map((def, ci) => {
       const indices = def.pts.map(([fx, fy]) => {
-        const idx = stars.length;
-        stars.push({
+        const idx = conStars.length;
+        conStars.push({
           x:     fx * canvas.width,
           y:     fy * canvas.height,
           r:     0.85 + Math.random() * 0.55,
@@ -360,7 +344,7 @@ function initStarField() {
     const threshold = Math.max(42, canvas.width * 0.028);
     for (let ci = 0; ci < constellations.length; ci++) {
       for (const idx of constellations[ci].indices) {
-        if (Math.hypot(stars[idx].x - mouseX, stars[idx].y - mouseY) < threshold) return ci;
+        if (Math.hypot(conStars[idx].x - mouseX, conStars[idx].y - mouseY) < threshold) return ci;
       }
     }
     return -1;
@@ -374,9 +358,8 @@ function initStarField() {
     const bw = tw + pad * 2;
     const bx = Math.max(6, Math.min(canvas.width - bw - 6, x - bw / 2));
     const by = Math.max(6, y - h - 14);
-    const r  = h / 2; // full pill radius
+    const r  = h / 2;
 
-    // soft glow halo behind the pill
     ctx.globalAlpha = alpha * 0.30;
     ctx.shadowColor = 'rgba(150, 175, 255, 1)';
     ctx.shadowBlur  = 16;
@@ -386,19 +369,16 @@ function initStarField() {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // pill body
     ctx.globalAlpha = alpha * 0.92;
     ctx.fillStyle   = 'rgba(7, 4, 26, 0.86)';
     ctx.beginPath();
     ctx.roundRect(bx, by, bw, h, r);
     ctx.fill();
 
-    // pill border
     ctx.strokeStyle = 'rgba(165, 190, 255, 0.45)';
     ctx.lineWidth   = 0.9;
     ctx.stroke();
 
-    // label
     ctx.globalAlpha  = alpha;
     ctx.fillStyle    = 'rgba(215, 228, 255, 0.97)';
     ctx.textAlign    = 'left';
@@ -407,16 +387,26 @@ function initStarField() {
     ctx.restore();
   }
 
-  function draw() {
+  function draw(timestamp) {
+    const dt = lastTimestamp === null ? 1 / 60 : Math.min(0.1, (timestamp - lastTimestamp) / 1000);
+    lastTimestamp = timestamp;
+    t = (t + dt) % 1000;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    t += 1 / 60;
 
     ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = neb1;   ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = neb2;   ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = neb3;   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    stars.forEach(s => {
+    bgStars.forEach(s => {
+      ctx.globalAlpha = Math.max(0.04, Math.min(1, s.base + Math.sin(t * s.freq * Math.PI * 2 + s.phase) * s.amp));
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    conStars.forEach(s => {
       ctx.globalAlpha = Math.max(0.04, Math.min(1, s.base + Math.sin(t * s.freq * Math.PI * 2 + s.phase) * s.amp));
       ctx.fillStyle = s.color;
       ctx.beginPath();
@@ -426,19 +416,18 @@ function initStarField() {
 
     const hovered    = findHoveredCon();
     const anyHovered = hovered >= 0;
-    const DT = 1 / 60;
 
     for (let ci = 0; ci < constellations.length; ci++) {
       const con = constellations[ci];
 
-      con.nextFlash -= DT;
+      con.nextFlash -= dt;
       if (con.nextFlash <= 0 && !con.flashing) {
         con.flashing  = true;
         con.flashP    = 0;
         con.nextFlash = 4 + Math.random() * 9;
       }
       if (con.flashing) {
-        con.flashP += DT / 6.0;
+        con.flashP += dt / 6.0;
         if (con.flashP >= 1) { con.flashing = false; con.flashP = 0; }
         const fp  = con.flashP;
         const env = fp < 0.2 ? Math.sin((fp / 0.2) * Math.PI / 2)
@@ -464,8 +453,8 @@ function initStarField() {
       ctx.lineWidth   = isHovered ? 1.3 : 0.7;
       ctx.lineCap = 'round';
       for (const [i, j] of con.edges) {
-        const sa = stars[con.indices[i]];
-        const sb = stars[con.indices[j]];
+        const sa = conStars[con.indices[i]];
+        const sb = conStars[con.indices[j]];
         ctx.beginPath();
         ctx.moveTo(sa.x, sa.y);
         ctx.lineTo(sb.x, sb.y);
@@ -475,8 +464,8 @@ function initStarField() {
       if (con.hoverAlpha > 0.12) {
         let centX = 0, topY = Infinity;
         for (const idx of con.indices) {
-          centX += stars[idx].x;
-          if (stars[idx].y < topY) topY = stars[idx].y;
+          centX += conStars[idx].x;
+          if (conStars[idx].y < topY) topY = conStars[idx].y;
         }
         centX /= con.indices.length;
         drawTooltip(con.name, centX, topY, con.hoverAlpha);
@@ -518,15 +507,27 @@ function initStarField() {
       }
     }
 
-    ctx.globalAlpha = 1;
     if (active) rafId = requestAnimationFrame(draw);
+  }
+
+  function stop() {
+    active = false;
+    cancelAnimationFrame(rafId);
+    clearTimeout(shootTimer);
   }
 
   function start() {
     if (active) return;
     active = true;
+    lastTimestamp = null;
+    sessionDefs = generateSessionDefs();
+    sessionNames = (() => {
+      const names = SILLY_NAMES.slice().sort(() => Math.random() - 0.5);
+      if (Math.random() < 0.05) names[Math.floor(Math.random() * sessionDefs.length)] = 'Yashi Pozmantiria';
+      return names;
+    })();
     resize();
-    draw();
+    rafId = requestAnimationFrame(draw);
     scheduleNext();
   }
 
@@ -543,14 +544,11 @@ function initStarField() {
   // Prevent mobile scroll and pinch-zoom across the whole page.
   // CSS overflow:hidden + overscroll-behavior don't stop iOS Safari's elastic
   // scroll; a non-passive touchmove listener with preventDefault() does.
-  // gesturestart/change block Safari's native pinch-zoom gesture.
-  document.addEventListener('touchmove',     e => e.preventDefault(), { passive: false });
-  document.addEventListener('gesturestart',  e => e.preventDefault(), { passive: false });
-  document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  if ('ongesturestart' in window) {
+    document.addEventListener('gesturestart',  e => e.preventDefault(), { passive: false });
+    document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+  }
 
   start();
-}
-
-// ── Init ─────────────────────────────────────────────────────────
-
-initStarField();
+})();

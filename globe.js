@@ -88,8 +88,9 @@
   let moonDragging   = false;
   let moonDragVel    = 0;
 
-  const vertices = [];
-  const grid     = [];
+  const vertices       = [];
+  const sortedVertices = [];
+  const grid           = [];
   let   ctx;
 
   function generateVertices() {
@@ -116,6 +117,7 @@
           _scale: 1, _rz: 0, _heatDist: MOUSE_RADIUS + 1,
         };
         vertices.push(v);
+        sortedVertices.push(v);
         grid[i][j] = v;
       }
     }
@@ -457,7 +459,8 @@
     updateProjections();
     updateSprings();
     updateRipple();
-    const sorted = vertices.slice().sort((a, b) => a._rz - b._rz);
+    sortedVertices.sort((a, b) => a._rz - b._rz);
+    const sorted = sortedVertices;
 
     ctx.clearRect(0, 0, W, H);
     drawGlow();
@@ -504,6 +507,39 @@
     ctx = canvas.getContext('2d');
     canvas.width  = W;
     canvas.height = H;
+
+    const releaseMoon = () => {
+      if (!moonDragging) return;
+      moonDragging  = false;
+      moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
+      canvas.style.cursor = 'grab';
+      if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
+    };
+
+    const onRelease = () => {
+      if (!dragVertex) return;
+
+      const amp = Math.min(Math.hypot(dragVertex.driftX, dragVertex.driftY) * 0.5, 30);
+      ripple = { startTime: Date.now(), ox: dragVertex.x0, oy: dragVertex.y0, oz: dragVertex.z0, amp };
+
+      snapStartTime = Date.now();
+      for (let i = 0; i < vertices.length; i++) {
+        const v = vertices[i];
+        if (v.dragWeight > 0) {
+          v.snapping  = true;
+          v._snapDX0  = v.driftX;
+          v._snapDY0  = v.driftY;
+          v.dragWeight = 0;
+        }
+      }
+
+      const rawImpulse = dragVertex.driftX * IMPULSE_SCALE / R;
+      rotSpeed += Math.max(-0.05, Math.min(0.05, rawImpulse));
+
+      dragVertex = null;
+      canvas.style.cursor = 'grab';
+      if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
+    };
 
     canvas.addEventListener('pointermove', e => {
       if (e.buttons === 0 && dragVertex)  onRelease();
@@ -572,43 +608,6 @@
       }
       canvas.setPointerCapture(e.pointerId);
     });
-
-    function releaseMoon() {
-      if (!moonDragging) return;
-      moonDragging  = false;
-      // clamp to a sane maximum so a fast fling doesn't spin forever
-      moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
-      canvas.style.cursor = 'grab';
-      if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
-    }
-
-    function onRelease() {
-      if (!dragVertex) return;
-
-      // kick off ripple from the grabbed vertex's rest position
-      const amp = Math.min(Math.hypot(dragVertex.driftX, dragVertex.driftY) * 0.5, 30);
-      ripple = { startTime: Date.now(), ox: dragVertex.x0, oy: dragVertex.y0, oz: dragVertex.z0, amp };
-
-      // hand each influenced vertex to the analytical snap-back spring
-      snapStartTime = Date.now();
-      for (let i = 0; i < vertices.length; i++) {
-        const v = vertices[i];
-        if (v.dragWeight > 0) {
-          v.snapping  = true;
-          v._snapDX0  = v.driftX;
-          v._snapDY0  = v.driftY;
-          v.dragWeight = 0;
-        }
-      }
-
-      // convert horizontal pull into a spin impulse (capped to prevent extreme speeds)
-      const rawImpulse = dragVertex.driftX * IMPULSE_SCALE / R;
-      rotSpeed += Math.max(-0.05, Math.min(0.05, rawImpulse));
-
-      dragVertex = null;
-      canvas.style.cursor = 'grab';
-      if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
-    }
 
     window.addEventListener('pointerup', () => { onRelease(); releaseMoon(); });
 
