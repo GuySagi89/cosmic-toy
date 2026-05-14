@@ -682,6 +682,77 @@
       moonOrbitSpeed += (mddx / mdist * tdx + mddy / mdist * tdy) / tmag * strength * 1.2;
     });
 
+    window.addEventListener('comet-globe-impact', e => {
+      const { x: impX, y: impY, vx, vy } = e.detail;
+      const rect  = canvas.getBoundingClientRect();
+      const speed = Math.hypot(vx, vy) || 1;
+      const sf    = Math.min(speed / 400, 2.0);  // speedFactor: 1.0 at 400 px/s, capped at 2x
+      snapStartTime = Date.now();
+
+      // Convert impact screen pos to canvas coords, find nearest front-hemisphere vertex for ripple
+      const icx = (impX - rect.left) * (W / rect.width);
+      const icy = (impY - rect.top)  * (H / rect.height);
+      let nearest = null, bestDist = Infinity;
+      for (const v of vertices) {
+        const vsx  = rect.left + (v.projX / W) * rect.width;
+        const vsy  = rect.top  + (v.projY / H) * rect.height;
+        const vddx = vsx - impX, vddy = vsy - impY;
+        const vd   = Math.hypot(vddx, vddy) || 1;
+        const mag  = sf * 7.2 * v._scale;
+        v.driftX   += (vddx / vd) * mag;
+        v.driftY   += (vddy / vd) * mag;
+        v._snapDX0  = v.driftX;
+        v._snapDY0  = v.driftY;
+        v.snapping  = true;
+        v.dragWeight = 0;
+        if (v._rz < 0) {
+          const d = Math.hypot(v.projX - icx, v.projY - icy);
+          if (d < bestDist) { bestDist = d; nearest = v; }
+        }
+      }
+      if (nearest) {
+        ripple = { startTime: Date.now(), ox: nearest.x0, oy: nearest.y0, oz: nearest.z0, amp: sf * 14 };
+      }
+
+      // Spin: direction from horizontal component, magnitude scales with speed
+      rotSpeed += (-vx / speed) * 0.03 * sf;
+    });
+
+    window.addEventListener('comet-moon-impact', e => {
+      const { vx, vy } = e.detail;
+      const speed = Math.hypot(vx, vy) || 1;
+      const sf    = Math.min(speed / 400, 2.0);
+      // Project comet velocity onto the moon's orbital tangent to get directional push
+      const tangX = -Math.sin(moonOrbitAngle);
+      const tangY = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
+      const tangLen = Math.hypot(tangX, tangY) || 1;
+      const proj = (vx * tangX + vy * tangY) / (speed * tangLen);
+      moonOrbitSpeed += proj * 0.08 * sf;
+    });
+
+    window.triggerGlobeRipple = function(impX, impY) {
+      const rect = canvas.getBoundingClientRect();
+      const icx  = (impX - rect.left) * (W / rect.width);
+      const icy  = (impY - rect.top)  * (H / rect.height);
+      let nearest = null, bestDist = Infinity;
+      for (const v of vertices) {
+        if (v._rz < 0) {
+          const d = Math.hypot(v.projX - icx, v.projY - icy);
+          if (d < bestDist) { bestDist = d; nearest = v; }
+        }
+      }
+      if (nearest) {
+        ripple = { startTime: Date.now(), ox: nearest.x0, oy: nearest.y0, oz: nearest.z0, amp: 18 };
+      }
+    };
+
+    window.getMoonScreenPos = function () {
+      const m   = getMoonPos();
+      const rect = canvas.getBoundingClientRect();
+      const scl  = rect.width / W;
+      return { x: rect.left + m.px * scl, y: rect.top + m.py * scl, r: MOON_R * m.s * scl };
+    };
+
     generateVertices();
     requestAnimationFrame(tick);
   }

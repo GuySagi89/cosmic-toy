@@ -227,6 +227,43 @@ body {
   border-top-color: rgba(6, 3, 20, 0.97);
 }
 
+/* ── Comet slot ── */
+#gadget-comet {
+  background: radial-gradient(circle at 45% 30%, #001a3a 0%, #000814 55%);
+  box-shadow:
+    0 0 0 1px rgba(120, 220, 255, 0.40),
+    0 0 14px 4px rgba(60, 180, 255, 0.45),
+    inset 0 0 10px rgba(0, 0, 0, 0.90);
+  position: relative;
+  transition: box-shadow 0.22s ease;
+}
+#gadget-comet:hover {
+  box-shadow:
+    0 0 0 1px rgba(160, 235, 255, 0.65),
+    0 0 22px 7px rgba(80, 210, 255, 0.70),
+    inset 0 0 10px rgba(0, 0, 0, 0.90);
+}
+#gadget-comet::before {
+  content: '';
+  position: absolute;
+  top: 22%; left: 68%;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px 3px rgba(160, 230, 255, 0.8);
+  pointer-events: none;
+}
+#gadget-comet::after {
+  content: '';
+  position: absolute;
+  top: 30%; left: 55%;
+  width: 3px; height: 60%;
+  background: linear-gradient(to bottom, rgba(180, 240, 255, 0.9), transparent);
+  border-radius: 2px;
+  transform: rotate(-40deg) translateX(-50%);
+  pointer-events: none;
+}
+
 /* ── Drag ghost ── */
 .gadget-drag-ghost {
   position: fixed;
@@ -246,3 +283,11 @@ body {
     0 0 24px 8px rgba(180, 110, 255, 0.65),
     inset 0 0 10px rgba(0, 0, 0, 0.95);
 }
+
+.gadget-drag-ghost[data-gadget="comet"] {
+  width: 36px;
+  height: 36px;
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, rgba(120, 200, 255, 0.6) 35%, transparent 70%);
+  box-shadow: 0 0 10px 4px rgba(120, 220, 255, 0.55);
+}
+
