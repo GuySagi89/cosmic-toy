@@ -764,6 +764,18 @@
       }
     }
 
+    // Enter BH swirl once inside the dark shadow zone
+    const allBHsShip = blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles];
+    for (const bh of allBHsShip) {
+      const dx = bh.x - spaceship.x, dy = bh.y - spaceship.y;
+      const d  = Math.hypot(dx, dy);
+      if (d < bh.baseRadius * 3) {
+        spaceship.swirl  = { bh, angle: Math.atan2(spaceship.y - bh.y, spaceship.x - bh.x), r: Math.max(d, 5), age: 0, maxAge: 0.9 };
+        spaceship.active = false;
+        break;
+      }
+    }
+
     if (!spaceship.active) {
       spaceship.alpha = Math.max(0, spaceship.alpha - dt * 1.3);
       if (spaceship.alpha <= 0) { spaceship = null; return; }
