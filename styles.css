@@ -35,13 +35,21 @@ body {
 /* ── Globe canvas ── */
 #globe-canvas {
   display: block;
-  width:  min(500px, 90vmin);
-  height: min(500px, 90vmin);
+  width:  min(500px, 72vmin);   /* mobile-first: compact */
+  height: min(500px, 72vmin);
   cursor: grab;
   touch-action: none;
   filter:
     drop-shadow(0 0 18px rgba(130, 50, 240, 0.50))
     drop-shadow(0 0 48px rgba(80,  20, 180, 0.25));
+}
+
+/* Tablet / desktop: give the globe more room */
+@media (min-width: 600px) and (min-height: 600px) {
+  #globe-canvas {
+    width:  min(500px, 90vmin);
+    height: min(500px, 90vmin);
+  }
 }
 
 #globe-canvas:active { cursor: grabbing; }

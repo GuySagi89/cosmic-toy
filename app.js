@@ -53,13 +53,22 @@ function initStarField() {
   // Within a constellation a non-crossing spanning tree is computed via
   // Prim's nearest-neighbour with a segment-intersection guard.
 
+  // 3×2 grid — tablet/desktop
   const ZONES = [
-    [0.00, 0.00, 0.33, 0.50],  // top-left
-    [0.33, 0.00, 0.67, 0.50],  // top-center
-    [0.67, 0.00, 1.00, 0.50],  // top-right
-    [0.00, 0.50, 0.33, 1.00],  // bottom-left
-    [0.33, 0.50, 0.67, 1.00],  // bottom-center
-    [0.67, 0.50, 1.00, 1.00],  // bottom-right
+    [0.00, 0.00, 0.33, 0.50],
+    [0.33, 0.00, 0.67, 0.50],
+    [0.67, 0.00, 1.00, 0.50],
+    [0.00, 0.50, 0.33, 1.00],
+    [0.33, 0.50, 0.67, 1.00],
+    [0.67, 0.50, 1.00, 1.00],
+  ];
+
+  // 2×2 grid — mobile (fewer, larger zones so clusters fit inside)
+  const ZONES_MOBILE = [
+    [0.00, 0.00, 0.50, 0.50],
+    [0.50, 0.00, 1.00, 0.50],
+    [0.00, 0.50, 0.50, 1.00],
+    [0.50, 0.50, 1.00, 1.00],
   ];
 
   function cross2D(ax, ay, bx, by) { return ax * by - ay * bx; }
@@ -214,9 +223,16 @@ function initStarField() {
   }
 
   function generateSessionDefs() {
+    const vmin = Math.min(window.innerWidth, window.innerHeight);
+    // mobile: 2×2 grid, 3 constellations — less clutter on small screens
+    // widescreen: all 6 zones — fills the extra sky on large monitors
+    // default: 3×2 grid, 5 constellations
+    const zones = vmin < 600 ? ZONES_MOBILE : ZONES;
+    const count = vmin < 600 ? 3 : vmin >= 900 ? 6 : 5;
+
     const defs = [];
-    for (const zone of ZONES.slice().sort(() => Math.random() - 0.5)) {
-      if (defs.length >= 5) break;
+    for (const zone of zones.slice().sort(() => Math.random() - 0.5)) {
+      if (defs.length >= count) break;
       const def = generateConstellationInZone(zone);
       if (def) defs.push(def);
     }
@@ -511,9 +527,12 @@ function initStarField() {
 
   window.addEventListener('resize', () => { if (active) resize(); });
 
-  document.addEventListener('pointermove',  e => { mouseX = e.clientX; mouseY = e.clientY; });
+  // Skip events that originate from the globe canvas — pointer capture makes those
+  // bubble to document even mid-drag, which would falsely trigger constellation hover.
+  const notGlobe = e => e.target.id !== 'globe-canvas';
+  document.addEventListener('pointermove',  e => { if (notGlobe(e)) { mouseX = e.clientX; mouseY = e.clientY; } });
   document.addEventListener('pointerleave', () => { mouseX = -1; mouseY = -1; });
-  document.addEventListener('pointerdown',  e => { mouseX = e.clientX; mouseY = e.clientY; });
+  document.addEventListener('pointerdown',  e => { if (notGlobe(e)) { mouseX = e.clientX; mouseY = e.clientY; } });
   document.addEventListener('pointerup',    () => { mouseX = -1; mouseY = -1; });
 
   start();
