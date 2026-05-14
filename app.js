@@ -902,9 +902,8 @@
     ctx.globalAlpha = spaceship.alpha;
     ctx.translate(spaceship.x, spaceship.y);
 
-    // Warning rings — drawn before rotate so they stay screen-aligned (circles are invariant, but
-    // this keeps the shadow state isolated before hull drawing)
-    if (hits >= 7) {
+    // Warning rings — suppressed while swirling into a BH
+    if (hits >= 7 && !spaceship.swirl) {
       const period   = 1000 / warnFreq;
       const maxRingR = 55 + (hits - 7) * 14;
       ctx.save();
@@ -924,6 +923,11 @@
     }
 
     ctx.rotate(spaceship.angle);
+
+    if (spaceship.swirl) {
+      const s = Math.max(0, 1 - Math.pow(spaceship.swirl.age / spaceship.swirl.maxAge, 0.6));
+      ctx.scale(s, s);
+    }
 
     // Body glow — shifts purple → red, pulses hard on last 3 hits
     ctx.shadowColor = `rgba(${glR}, ${glG}, ${glB}, 0.9)`;
@@ -1086,7 +1090,6 @@
         sw.angle += (3 + frac * 10) * dt;
         c.x = sw.bh.x + Math.cos(sw.angle) * r;
         c.y = sw.bh.y + Math.sin(sw.angle) * r;
-        c.swirlFrac = frac;
         continue;
       }
 
@@ -1171,9 +1174,10 @@
     for (const c of comets) {
       // Swirling into BH: draw only a shrinking core, no tail
       if (c.swirl) {
-        const scale = Math.max(0, 1 - Math.pow(c.swirlFrac, 0.55));
+        const frac  = c.swirl.age / c.swirl.maxAge;
+        const scale = Math.max(0, 1 - Math.pow(frac, 0.55));
         if (scale < 0.02) continue;
-        const r = 10 * scale;
+        const r = Math.max(0.1, 10 * scale);
         ctx.save();
         ctx.globalAlpha = scale;
         ctx.shadowColor = 'rgba(160, 240, 255, 1)';
