@@ -41,7 +41,7 @@
     'The Glum Croissant',       'The Restless Semicolon',    'The Ponderous Blancmange',
     'The Indecisive Vortex',    'Brigadier Fluffington',     'The Cosmic Dressing Gown',
     'The Confused Meridian',    'The Melancholy Trapezoid',  'The Oscillating Biscuit Tin',
-    'The Magnificent Kerfuffle', 'Elkabetzium Supreme',
+    'The Magnificent Kerfuffle', 'Elkabetzium Supreme', 'Eladilolo Major', 'Fredul Minor',
   ];
 
   // ── Constellation geometry constants ─────────────────────────────────────────
