@@ -396,7 +396,6 @@
     if (blackHole) {
       blackHole.age = blackHole.maxAge * 0.92;
       if (!blackHole.explodeFired) {
-        triggerShipExplosion();
         window.dispatchEvent(new CustomEvent('blackhole-explode', { detail: { x: blackHole.x, y: blackHole.y } }));
         blackHole.explodeFired = true;
       }
@@ -454,6 +453,15 @@
     return pos;
   }
 
+  function screenEdgeDist(bh) {
+    return Math.max(
+      Math.hypot(bh.x,                  bh.y),
+      Math.hypot(canvas.width - bh.x,   bh.y),
+      Math.hypot(bh.x,                  canvas.height - bh.y),
+      Math.hypot(canvas.width - bh.x,   canvas.height - bh.y)
+    );
+  }
+
   function drawBlackHole(bh) {
     const frac     = bh.age / bh.maxAge;
     const bhAlpha  = frac < 0.05 ? frac / 0.05
@@ -491,7 +499,7 @@
 
     // ── Evaporation explosion ─────────────────────────────────────────────────
     if (evapFrac > 0) {
-      const maxR = Math.min(canvas.width, canvas.height);
+      const maxR = screenEdgeDist(bh);
 
       // Nova flash — radial flood of light, peaks at mid-evaporation then fades
       const flashPeak = Math.sin(evapFrac * Math.PI);
@@ -507,9 +515,9 @@
         ctx.fill();
       }
 
-      // Primary shockwave — ease-out so it bursts fast then slows
+      // Primary shockwave — ease-out so it bursts fast then slows to screen edge
       const easeOut = t => 1 - Math.pow(1 - t, 3);
-      const wave1R = easeOut(evapFrac) * maxR * 0.65;
+      const wave1R = easeOut(evapFrac) * maxR;
       ctx.save();
       ctx.beginPath();
       ctx.arc(bh.x, bh.y, rs + wave1R, 0, Math.PI * 2);
@@ -523,7 +531,7 @@
       // Secondary shockwave — launches slightly later, slower, dimmer
       if (evapFrac > 0.18) {
         const w2f  = (evapFrac - 0.18) / 0.82;
-        const wave2R = easeOut(w2f) * maxR * 0.48;
+        const wave2R = easeOut(w2f) * maxR * 0.74;
         ctx.save();
         ctx.beginPath();
         ctx.arc(bh.x, bh.y, rs + wave2R, 0, Math.PI * 2);
@@ -544,6 +552,56 @@
     ctx.fill();
 
     ctx.restore();
+  }
+
+  function checkBHWave(bh) {
+    const frac     = bh.age / bh.maxAge;
+    const evapFrac = Math.max(0, (frac - 0.92) / 0.08);
+    if (evapFrac <= 0) return;
+    if (!bh.waveHits) bh.waveHits = new Set();
+
+    const rs      = bh.baseRadius * Math.max(0.05, 1 - evapFrac * 0.9);
+    const easeOut = t => 1 - Math.pow(1 - t, 3);
+    const maxR    = screenEdgeDist(bh);
+    const waveR   = rs + easeOut(evapFrac) * maxR;
+
+    // Globe — fire once when the ring crosses the near surface edge
+    if (!bh.waveHits.has('globe')) {
+      const globeEl = document.getElementById('globe-canvas');
+      if (globeEl) {
+        const gr     = globeEl.getBoundingClientRect();
+        const gcx    = gr.left + gr.width  / 2;
+        const gcy    = gr.top  + gr.height / 2;
+        const globeR = gr.width * 0.22;
+        const dist   = Math.hypot(bh.x - gcx, bh.y - gcy);
+        if (waveR >= dist - globeR) {
+          bh.waveHits.add('globe');
+          const nx   = dist > 0 ? (gcx - bh.x) / dist : 1;
+          const ny   = dist > 0 ? (gcy - bh.y) / dist : 0;
+          // Impact point = globe surface nearest to BH
+          const impX = gcx - nx * globeR;
+          const impY = gcy - ny * globeR;
+          if (window.triggerGlobeRipple) window.triggerGlobeRipple(impX, impY);
+        }
+      }
+    }
+
+    // Spaceship — destroy when wave reaches it
+    if (!bh.waveHits.has('spaceship') && spaceship && !spaceship.exploding) {
+      if (waveR >= Math.hypot(bh.x - spaceship.x, bh.y - spaceship.y)) {
+        bh.waveHits.add('spaceship');
+        triggerShipExplosion();
+      }
+    }
+
+    // Comets — blast each one the wave crosses
+    for (let i = comets.length - 1; i >= 0; i--) {
+      const c = comets[i];
+      if (waveR >= Math.hypot(bh.x - c.x, bh.y - c.y) - 8) {
+        blastComet(c, bh.x, bh.y);
+        comets.splice(i, 1);
+      }
+    }
   }
 
   // ── Spaceship ────────────────────────────────────────────────────
@@ -895,11 +953,6 @@
     }
   }
 
-  function blastCometFromBH(bhX, bhY) {
-    for (const c of comets) blastComet(c, bhX, bhY);
-    comets = [];
-  }
-
   function updateComet(dt) {
     const allBHs  = blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles];
     const globeEl = document.getElementById('globe-canvas');
@@ -1138,6 +1191,7 @@
       bh.age      += dt;
       bh.rotation += dt * 2.8;
       drawBlackHole(bh);
+      checkBHWave(bh);
       if (bh.age >= bh.maxAge) dyingBlackHoles.splice(i, 1);
     }
 
@@ -1145,8 +1199,8 @@
       blackHole.age      += dt;
       blackHole.rotation += dt * 2.8; // faster vortex; (rs/d)² exponent keeps inner much faster
       drawBlackHole(blackHole);
+      checkBHWave(blackHole);
       if (!blackHole.explodeFired && blackHole.age / blackHole.maxAge > 0.92) {
-        triggerShipExplosion();
         window.dispatchEvent(new CustomEvent('blackhole-explode', { detail: { x: blackHole.x, y: blackHole.y } }));
         blackHole.explodeFired = true;
       }
@@ -1218,7 +1272,6 @@
   }
 
   window.addEventListener('resize', () => { if (active) resize(); });
-  window.addEventListener('blackhole-explode', e => blastCometFromBH(e.detail.x, e.detail.y));
 
   // Skip events that originate from the globe canvas — pointer capture makes those
   // bubble to document even mid-drag, which would falsely trigger constellation hover.
