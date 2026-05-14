@@ -611,6 +611,67 @@
 
     window.addEventListener('pointerup', () => { onRelease(); releaseMoon(); });
 
+    window.addEventListener('blackhole-explode', e => {
+      const { x: bhX, y: bhY } = e.detail;
+      const rect = canvas.getBoundingClientRect();
+      const gcx  = rect.left + rect.width  / 2;
+      const gcy  = rect.top  + rect.height / 2;
+      // (nx, ny): unit vector FROM globe center TOWARD BH in screen space
+      const ddx  = bhX - gcx;
+      const ddy  = bhY - gcy;
+      const dist = Math.hypot(ddx, ddy) || 1;
+      const nx   = ddx / dist;
+      const ny   = ddy / dist;
+      const strength = Math.max(0.35, 1 - dist / 1200);
+
+      // Globe: each vertex pushed AWAY from BH based on its own projected screen position
+      // Spin driven by globe-center direction (Y-axis rotation, horizontal component only)
+      rotSpeed += (bhX - gcx) / dist * strength * 0.05;
+
+      snapStartTime = Date.now();
+      for (const v of vertices) {
+        const vsx  = rect.left + (v.projX / W) * rect.width;
+        const vsy  = rect.top  + (v.projY / H) * rect.height;
+        const vddx = vsx - bhX;
+        const vddy = vsy - bhY;
+        const vd   = Math.hypot(vddx, vddy) || 1;
+        const mag  = strength * 32 * v._scale;
+        v.driftX    += (vddx / vd) * mag;
+        v.driftY    += (vddy / vd) * mag;
+        v._snapDX0   = v.driftX;
+        v._snapDY0   = v.driftY;
+        v.snapping   = true;
+        v.dragWeight = 0;
+      }
+
+      // Moon: pushed AWAY from BH based on the moon's own screen position.
+      // Project onto the moon's orbital screen-space tangent for full XY response.
+      const sinO    = Math.sin(moonOrbitAngle);
+      const cosO    = Math.cos(moonOrbitAngle);
+      const sinTilt = Math.sin(MOON_ORBIT_TILT);
+      const cosTilt = Math.cos(MOON_ORBIT_TILT);
+      const omx  =  MOON_ORBIT_R * cosO;
+      const omy  = -MOON_ORBIT_R * sinO * sinTilt;
+      const omz  =  MOON_ORBIT_R * sinO * cosTilt;
+      const denom = FOV_DIST + omz + R;
+      const s0   = FOV_DIST / denom;
+      const domx = -MOON_ORBIT_R * sinO;
+      const domy = -MOON_ORBIT_R * cosO * sinTilt;
+      const domz =  MOON_ORBIT_R * cosO * cosTilt;
+      const ds   = -FOV_DIST * domz / (denom * denom);
+      const tdx  = domx * s0 + omx * ds;
+      const tdy  = domy * s0 + omy * ds;
+      const tmag = Math.hypot(tdx, tdy) || 1;
+      // Moon's actual screen position (canvas → viewport CSS px)
+      const moonSx = rect.left + ((cx + omx * s0) / W) * rect.width;
+      const moonSy = rect.top  + ((cy + omy * s0) / H) * rect.height;
+      // Direction from BH toward moon = push moon away from BH
+      const mddx = moonSx - bhX;
+      const mddy = moonSy - bhY;
+      const mdist = Math.hypot(mddx, mddy) || 1;
+      moonOrbitSpeed += (mddx / mdist * tdx + mddy / mdist * tdy) / tmag * strength * 1.2;
+    });
+
     generateVertices();
     requestAnimationFrame(tick);
   }

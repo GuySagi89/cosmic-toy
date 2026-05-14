@@ -234,6 +234,8 @@
   let rafId = null, shootTimer = null, active = false, t = 0, lastTimestamp = null;
   let bgGrad = null, neb1 = null, neb2 = null, neb3 = null;
   let mouseX = -1, mouseY = -1;
+  let blackHole = null;
+  const clickTimes = [];
 
   function buildBackground() {
     bgGrad = ctx.createRadialGradient(
@@ -387,6 +389,135 @@
     ctx.restore();
   }
 
+  function spawnBlackHole(x, y) {
+    blackHole = { x, y, baseRadius: 28, age: 0, maxAge: 5.5, rotation: 0, explodeFired: false };
+  }
+
+  // Returns the apparent (lensed) screen position of a star near the black hole,
+  // or null if it has crossed the event horizon and should not be drawn.
+  // Uses simplified Schwarzschild angular deflection: Δθ = (rs/d)^1.5
+  function lensedPos(sx, sy, bh) {
+    const frac     = bh.age / bh.maxAge;
+    const bhAlpha  = frac < 0.05 ? frac / 0.05
+                   : frac > 0.92 ? (1 - (frac - 0.92) / 0.08)
+                   : 1;
+    const evapFrac = Math.max(0, (frac - 0.92) / 0.08);
+    const rs       = bh.baseRadius * Math.max(0.05, 1 - evapFrac * 0.9);
+
+    const dx = sx - bh.x, dy = sy - bh.y;
+    const d  = Math.hypot(dx, dy);
+    if (d > bh.baseRadius * 22) return { x: sx, y: sy }; // beyond lens radius
+    if (d < rs) return null;
+    if (d === 0) return { x: sx, y: sy };
+
+    const ratio    = rs / d;
+    // Angular: Schwarzschild bending + differential frame-dragging (inner rotates faster)
+    const deflect  = Math.pow(ratio, 1.5) * bhAlpha;
+    const orbit    = bh.rotation * ratio * ratio * bhAlpha;
+    // Radial inward compression — stars appear pulled toward the BH, strongest up close,
+    // fading with distance so the gradient from heavy warp to subtle warp is clearly visible
+    const compress = Math.pow(ratio, 1.5) * 0.32 * bhAlpha;
+    const newD     = d * (1 - compress);
+
+    const θ = Math.atan2(dy, dx);
+    return {
+      x: bh.x + newD * Math.cos(θ + deflect + orbit),
+      y: bh.y + newD * Math.sin(θ + deflect + orbit),
+    };
+  }
+
+  function drawBlackHole(bh) {
+    const frac     = bh.age / bh.maxAge;
+    const bhAlpha  = frac < 0.05 ? frac / 0.05
+                   : frac > 0.92 ? (1 - (frac - 0.92) / 0.08)
+                   : 1;
+    const evapFrac = Math.max(0, (frac - 0.92) / 0.08);
+    const rs       = bh.baseRadius * Math.max(0.05, 1 - evapFrac * 0.9);
+
+    ctx.save();
+    ctx.globalAlpha = bhAlpha;
+
+    // ── Gravitational shadow ──────────────────────────────────────────────────
+    // Darkens the region around the singularity so the vortex reads as a void
+    const shadow = ctx.createRadialGradient(bh.x, bh.y, rs, bh.x, bh.y, rs * 13);
+    shadow.addColorStop(0,    'rgba(0, 0,  0, 0.80)');
+    shadow.addColorStop(0.12, 'rgba(2, 0,  8, 0.50)');
+    shadow.addColorStop(0.40, 'rgba(4, 0, 12, 0.20)');
+    shadow.addColorStop(1,    'rgba(0, 0,  0, 0)');
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.arc(bh.x, bh.y, rs * 13, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── Event horizon rim ─────────────────────────────────────────────────────
+    // Thin purple-white edge gives the singularity a crisp, defined boundary
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(bh.x, bh.y, rs * 1.02, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(190, 160, 255, ${0.22 + evapFrac * 0.78})`;
+    ctx.lineWidth   = 0.7 + evapFrac * 3.5;
+    ctx.shadowColor = 'rgba(180, 150, 255, 1)';
+    ctx.shadowBlur  = 5 + evapFrac * 28;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Evaporation explosion ─────────────────────────────────────────────────
+    if (evapFrac > 0) {
+      const maxR = Math.min(canvas.width, canvas.height);
+
+      // Nova flash — radial flood of light, peaks at mid-evaporation then fades
+      const flashPeak = Math.sin(evapFrac * Math.PI);
+      if (flashPeak > 0.01) {
+        const flash = ctx.createRadialGradient(bh.x, bh.y, 0, bh.x, bh.y, rs * 14);
+        flash.addColorStop(0,    `rgba(255, 255, 255, ${flashPeak * 0.65})`);
+        flash.addColorStop(0.08, `rgba(210, 175, 255, ${flashPeak * 0.40})`);
+        flash.addColorStop(0.30, `rgba(130,  90, 255, ${flashPeak * 0.14})`);
+        flash.addColorStop(1,    'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = flash;
+        ctx.beginPath();
+        ctx.arc(bh.x, bh.y, rs * 14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Primary shockwave — ease-out so it bursts fast then slows
+      const easeOut = t => 1 - Math.pow(1 - t, 3);
+      const wave1R = easeOut(evapFrac) * maxR * 0.65;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(bh.x, bh.y, rs + wave1R, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(220, 190, 255, ${(1 - evapFrac) * 0.75})`;
+      ctx.lineWidth   = 4 * (1 - evapFrac) + 0.5;
+      ctx.shadowColor = 'rgba(210, 180, 255, 1)';
+      ctx.shadowBlur  = 30;
+      ctx.stroke();
+      ctx.restore();
+
+      // Secondary shockwave — launches slightly later, slower, dimmer
+      if (evapFrac > 0.18) {
+        const w2f  = (evapFrac - 0.18) / 0.82;
+        const wave2R = easeOut(w2f) * maxR * 0.48;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bh.x, bh.y, rs + wave2R, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(180, 140, 255, ${(1 - w2f) * 0.45})`;
+        ctx.lineWidth   = 2.5 * (1 - w2f) + 0.3;
+        ctx.shadowColor = 'rgba(180, 140, 255, 1)';
+        ctx.shadowBlur  = 18;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // ── Event horizon disc ────────────────────────────────────────────────────
+    ctx.shadowBlur = 0;
+    ctx.fillStyle  = '#000000';
+    ctx.beginPath();
+    ctx.arc(bh.x, bh.y, rs, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
   function draw(timestamp) {
     const dt = lastTimestamp === null ? 1 / 60 : Math.min(0.1, (timestamp - lastTimestamp) / 1000);
     lastTimestamp = timestamp;
@@ -400,17 +531,29 @@
     ctx.fillStyle = neb3;   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     bgStars.forEach(s => {
+      let drawX = s.x, drawY = s.y;
+      if (blackHole) {
+        const pos = lensedPos(s.x, s.y, blackHole);
+        if (!pos) return;
+        drawX = pos.x; drawY = pos.y;
+      }
       ctx.globalAlpha = Math.max(0.04, Math.min(1, s.base + Math.sin(t * s.freq * Math.PI * 2 + s.phase) * s.amp));
       ctx.fillStyle = s.color;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.arc(drawX, drawY, s.r, 0, Math.PI * 2);
       ctx.fill();
     });
     conStars.forEach(s => {
+      let drawX = s.x, drawY = s.y;
+      if (blackHole) {
+        const pos = lensedPos(s.x, s.y, blackHole);
+        if (!pos) return;
+        drawX = pos.x; drawY = pos.y;
+      }
       ctx.globalAlpha = Math.max(0.04, Math.min(1, s.base + Math.sin(t * s.freq * Math.PI * 2 + s.phase) * s.amp));
       ctx.fillStyle = s.color;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.arc(drawX, drawY, s.r, 0, Math.PI * 2);
       ctx.fill();
     });
 
@@ -455,17 +598,30 @@
       for (const [i, j] of con.edges) {
         const sa = conStars[con.indices[i]];
         const sb = conStars[con.indices[j]];
+        let ax = sa.x, ay = sa.y, bx = sb.x, by = sb.y;
+        if (blackHole) {
+          const pa = lensedPos(sa.x, sa.y, blackHole);
+          const pb = lensedPos(sb.x, sb.y, blackHole);
+          if (!pa || !pb) continue;
+          ax = pa.x; ay = pa.y; bx = pb.x; by = pb.y;
+        }
         ctx.beginPath();
-        ctx.moveTo(sa.x, sa.y);
-        ctx.lineTo(sb.x, sb.y);
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
         ctx.stroke();
       }
 
       if (con.hoverAlpha > 0.12) {
         let centX = 0, topY = Infinity;
         for (const idx of con.indices) {
-          centX += conStars[idx].x;
-          if (conStars[idx].y < topY) topY = conStars[idx].y;
+          const s = conStars[idx];
+          let sx = s.x, sy = s.y;
+          if (blackHole) {
+            const pos = lensedPos(s.x, s.y, blackHole);
+            if (pos) { sx = pos.x; sy = pos.y; }
+          }
+          centX += sx;
+          if (sy < topY) topY = sy;
         }
         centX /= con.indices.length;
         drawTooltip(con.name, centX, topY, con.hoverAlpha);
@@ -473,6 +629,19 @@
     }
 
     ctx.globalAlpha = 1;
+
+    if (blackHole) {
+      blackHole.age      += dt;
+      blackHole.rotation += dt * 2.8; // faster vortex; (rs/d)² exponent keeps inner much faster
+      drawBlackHole(blackHole);
+      if (!blackHole.explodeFired && blackHole.age / blackHole.maxAge > 0.92) {
+        window.dispatchEvent(new CustomEvent('blackhole-explode', {
+          detail: { x: blackHole.x, y: blackHole.y }
+        }));
+        blackHole.explodeFired = true;
+      }
+      if (blackHole.age >= blackHole.maxAge) blackHole = null;
+    }
 
     if (shooting) {
       const tailX = shooting.x - shooting.dx * shooting.tail;
@@ -538,7 +707,17 @@
   const notGlobe = e => e.target.id !== 'globe-canvas';
   document.addEventListener('pointermove',  e => { if (notGlobe(e)) { mouseX = e.clientX; mouseY = e.clientY; } });
   document.addEventListener('pointerleave', () => { mouseX = -1; mouseY = -1; });
-  document.addEventListener('pointerdown',  e => { if (notGlobe(e)) { mouseX = e.clientX; mouseY = e.clientY; } });
+  document.addEventListener('pointerdown', e => {
+    if (!notGlobe(e)) return;
+    mouseX = e.clientX; mouseY = e.clientY;
+    const now = Date.now();
+    clickTimes.push(now);
+    if (clickTimes.length > 3) clickTimes.shift();
+    if (clickTimes.length === 3 && now - clickTimes[0] < 600) {
+      spawnBlackHole(e.clientX, e.clientY);
+      clickTimes.length = 0;
+    }
+  });
   document.addEventListener('pointerup',    () => { mouseX = -1; mouseY = -1; });
 
   // Prevent mobile scroll and pinch-zoom across the whole page.
