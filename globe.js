@@ -534,7 +534,15 @@
     });
 
     canvas.addEventListener('pointerdown', e => {
-      const { x, y } = canvasCoords(e, canvas);
+      const raw = canvasCoords(e, canvas);
+      const x = Math.max(0, Math.min(W, raw.x));
+      const y = Math.max(0, Math.min(H, raw.y));
+      // Sync position immediately so the first updateSprings() after pointerdown
+      // sees a correct ddx/ddy instead of the stale -9999 initial value, which
+      // would fling vertices off-canvas on the very first frame.
+      mouseX = x;
+      mouseY = y;
+      mouseInside = true;
 
       // Moon grab takes priority — check it first
       const m     = getMoonPos();
