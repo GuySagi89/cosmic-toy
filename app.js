@@ -535,6 +535,14 @@ function initStarField() {
   document.addEventListener('pointerdown',  e => { if (notGlobe(e)) { mouseX = e.clientX; mouseY = e.clientY; } });
   document.addEventListener('pointerup',    () => { mouseX = -1; mouseY = -1; });
 
+  // Prevent mobile scroll and pinch-zoom across the whole page.
+  // CSS overflow:hidden + overscroll-behavior don't stop iOS Safari's elastic
+  // scroll; a non-passive touchmove listener with preventDefault() does.
+  // gesturestart/change block Safari's native pinch-zoom gesture.
+  document.addEventListener('touchmove',     e => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturestart',  e => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+
   start();
 }
 
