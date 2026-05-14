@@ -508,12 +508,20 @@
     canvas.width  = W;
     canvas.height = H;
 
+    function updateCursor() {
+      if (dragVertex || moonDragging) return;
+      const m        = getMoonPos();
+      const overMoon = Math.hypot(mouseX - m.px, mouseY - m.py) < MOON_R * m.s * 2.0;
+      const overGlobe = Math.hypot(mouseX - cx, mouseY - cy) < R;
+      canvas.style.cursor = (overMoon || overGlobe) ? 'grab' : 'default';
+    }
+
     const releaseMoon = () => {
       if (!moonDragging) return;
       moonDragging  = false;
       moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
-      canvas.style.cursor = 'grab';
       if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
+      updateCursor();
     };
 
     const onRelease = () => {
@@ -537,8 +545,8 @@
       rotSpeed += Math.max(-0.05, Math.min(0.05, rawImpulse));
 
       dragVertex = null;
-      canvas.style.cursor = 'grab';
       if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
+      updateCursor();
     };
 
     canvas.addEventListener('pointermove', e => {
@@ -560,12 +568,14 @@
 
       mouseX = x;
       mouseY = y;
+      if (e.buttons === 0) updateCursor();
     });
 
     canvas.addEventListener('pointerenter', () => { mouseInside = true; });
     canvas.addEventListener('pointerleave', () => {
       mouseInside = false;
       if (!dragVertex && !moonDragging) { mouseX = -9999; mouseY = -9999; }
+      canvas.style.cursor = 'default';
       releaseMoon();
     });
 

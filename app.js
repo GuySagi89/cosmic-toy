@@ -235,7 +235,9 @@
   let bgGrad = null, neb1 = null, neb2 = null, neb3 = null;
   let mouseX = -1, mouseY = -1;
   let blackHole = null;
-  const clickTimes = [];
+  let dyingBlackHoles = [];
+  let spaceship = null;
+  let smokeParticles = [];
 
   function buildBackground() {
     bgGrad = ctx.createRadialGradient(
@@ -390,8 +392,17 @@
   }
 
   function spawnBlackHole(x, y) {
+    if (blackHole) {
+      blackHole.age = blackHole.maxAge * 0.92;
+      if (!blackHole.explodeFired) {
+        window.dispatchEvent(new CustomEvent('blackhole-explode', { detail: { x: blackHole.x, y: blackHole.y } }));
+        blackHole.explodeFired = true;
+      }
+      dyingBlackHoles.push(blackHole);
+    }
     blackHole = { x, y, baseRadius: 28, age: 0, maxAge: 5.5, rotation: 0, explodeFired: false };
   }
+  window.spawnBlackHole = spawnBlackHole;
 
   // Returns the apparent (lensed) screen position of a star near the black hole,
   // or null if it has crossed the event horizon and should not be drawn.
@@ -424,6 +435,21 @@
       x: bh.x + newD * Math.cos(θ + deflect + orbit),
       y: bh.y + newD * Math.sin(θ + deflect + orbit),
     };
+  }
+
+  function applyAllLensing(sx, sy) {
+    let pos = { x: sx, y: sy };
+    for (const bh of dyingBlackHoles) {
+      const p = lensedPos(pos.x, pos.y, bh);
+      if (!p) return null;
+      pos = p;
+    }
+    if (blackHole) {
+      const p = lensedPos(pos.x, pos.y, blackHole);
+      if (!p) return null;
+      pos = p;
+    }
+    return pos;
   }
 
   function drawBlackHole(bh) {
@@ -518,6 +544,187 @@
     ctx.restore();
   }
 
+  // ── Spaceship ────────────────────────────────────────────────────
+  function lerpAngle(a, b, t) {
+    let d = (b - a) % (Math.PI * 2);
+    if (d >  Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return a + d * Math.min(1, t);
+  }
+
+  function emitSmoke() {
+    if (!spaceship) return;
+    const bx = -Math.sin(spaceship.angle); // backward unit vector
+    const by =  Math.cos(spaceship.angle);
+    const rx = spaceship.x + bx * 12 + (Math.random() - 0.5) * 3;
+    const ry = spaceship.y + by * 12 + (Math.random() - 0.5) * 3;
+    const spread = (Math.random() - 0.5) * 0.65;
+    const cs = Math.cos(spread), ss = Math.sin(spread);
+    const speed = 32 + Math.random() * 35;
+    const maxLife = 0.50 + Math.random() * 0.35;
+    smokeParticles.push({
+      x: rx, y: ry,
+      vx: (bx * cs - by * ss) * speed + spaceship.vx * 0.12,
+      vy: (bx * ss + by * cs) * speed + spaceship.vy * 0.12,
+      life: maxLife,
+      maxLife,
+      r: 2.5 + Math.random() * 2.5,
+      core: Math.random() < 0.45,
+    });
+  }
+
+  function updateSpaceship(dt) {
+    if (!spaceship) return;
+
+    if (spaceship.exploding) {
+      spaceship.explodeAge += dt;
+      spaceship.alpha = Math.max(0, 1 - spaceship.explodeAge / (spaceship.explodeMaxAge * 0.28));
+      spaceship.vx *= Math.pow(0.95, dt * 60);
+      spaceship.vy *= Math.pow(0.95, dt * 60);
+      spaceship.x  += spaceship.vx * dt;
+      spaceship.y  += spaceship.vy * dt;
+      if (spaceship.explodeAge >= spaceship.explodeMaxAge) spaceship = null;
+      return;
+    }
+
+    if (spaceship.active) {
+      const dx = spaceship.targetX - spaceship.x;
+      const dy = spaceship.targetY - spaceship.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 2) {
+        const gain = 28;
+        spaceship.vx += (dx / dist) * Math.min(dist, 160) * gain * dt;
+        spaceship.vy += (dy / dist) * Math.min(dist, 160) * gain * dt;
+      }
+    }
+
+    // Speed cap
+    const speed = Math.hypot(spaceship.vx, spaceship.vy);
+    if (speed > 520) { spaceship.vx = spaceship.vx / speed * 520; spaceship.vy = spaceship.vy / speed * 520; }
+
+    // Drag — lighter when active so momentum carries through turns
+    const drag = Math.pow(spaceship.active ? 0.97 : 0.96, dt * 60);
+    spaceship.vx *= drag;
+    spaceship.vy *= drag;
+
+    // Integrate
+    spaceship.x += spaceship.vx * dt;
+    spaceship.y += spaceship.vy * dt;
+
+    const spd = Math.hypot(spaceship.vx, spaceship.vy);
+    if (spd > 12) {
+      spaceship.angle = lerpAngle(spaceship.angle, Math.atan2(spaceship.vy, spaceship.vx) + Math.PI / 2, Math.min(1, dt * 14));
+    }
+
+    // Exhaust smoke
+    if (spd > 25 && smokeParticles.length < 300) {
+      spaceship.emitAccum += dt * (spd / 80) * 60;
+      while (spaceship.emitAccum >= 1) { emitSmoke(); spaceship.emitAccum--; }
+    }
+
+    // Fade and destroy once released
+    if (!spaceship.active) {
+      spaceship.alpha = Math.max(0, spaceship.alpha - dt * 1.3);
+      if (spaceship.alpha <= 0) { spaceship = null; return; }
+    }
+  }
+
+  function updateSmoke(dt) {
+    for (let i = smokeParticles.length - 1; i >= 0; i--) {
+      const p = smokeParticles[i];
+      p.x  += p.vx * dt;
+      p.y  += p.vy * dt;
+      p.vx *= Math.pow(0.88, dt * 60);
+      p.vy *= Math.pow(0.88, dt * 60);
+      p.life -= dt;
+      if (p.life <= 0) smokeParticles.splice(i, 1);
+    }
+  }
+
+  function drawSmoke() {
+    if (!smokeParticles.length) return;
+    ctx.save();
+    smokeParticles.forEach(p => {
+      const frac  = 1 - p.life / p.maxLife;
+      const alpha = (p.life / p.maxLife) * (p.core ? 0.78 : 0.48);
+      const r     = p.r * (1 + frac * 2.8);
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      if (p.core) {
+        g.addColorStop(0,    `rgba(218, 198, 255, ${alpha})`);
+        g.addColorStop(0.35, `rgba(158, 112, 255, ${alpha * 0.50})`);
+        g.addColorStop(1,    'rgba(88, 48, 200, 0)');
+      } else {
+        g.addColorStop(0,    `rgba(128, 88, 228, ${alpha})`);
+        g.addColorStop(0.5,  `rgba(78, 50, 178, ${alpha * 0.35})`);
+        g.addColorStop(1,    'rgba(38, 18, 118, 0)');
+      }
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  function drawSpaceship() {
+    if (!spaceship) return;
+    ctx.save();
+    ctx.globalAlpha = spaceship.alpha;
+    ctx.translate(spaceship.x, spaceship.y);
+    ctx.rotate(spaceship.angle);
+
+    // Body glow
+    ctx.shadowColor = 'rgba(158, 118, 255, 0.9)';
+    ctx.shadowBlur  = 14;
+
+    // Hull polygon
+    ctx.beginPath();
+    ctx.moveTo( 0, -15);
+    ctx.lineTo(-12,   7);
+    ctx.lineTo( -5,   2);
+    ctx.lineTo(  0,  11);
+    ctx.lineTo(  5,   2);
+    ctx.lineTo( 12,   7);
+    ctx.closePath();
+
+    const bg = ctx.createLinearGradient(0, -15, 0, 11);
+    bg.addColorStop(0,   'rgba(192, 162, 255, 0.97)');
+    bg.addColorStop(0.5, 'rgba(126,  90, 228, 0.93)');
+    bg.addColorStop(1,   'rgba( 78,  55, 180, 0.88)');
+    ctx.fillStyle = bg;
+    ctx.fill();
+
+    ctx.shadowBlur  = 0;
+    ctx.strokeStyle = 'rgba(220, 208, 255, 0.92)';
+    ctx.lineWidth   = 1.2;
+    ctx.lineJoin    = 'round';
+    ctx.stroke();
+
+    // Cockpit
+    ctx.shadowColor = 'rgba(148, 232, 255, 0.9)';
+    ctx.shadowBlur  = 8;
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 2.5, 5, 0, 0, Math.PI * 2);
+    ctx.fillStyle   = 'rgba(172, 238, 255, 0.92)';
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+    ctx.strokeStyle = 'rgba(210, 248, 255, 0.50)';
+    ctx.lineWidth   = 0.7;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  window.startSpaceship = function(x, y) {
+    spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0 };
+  };
+  window.updateSpaceshipTarget = function(x, y) {
+    if (spaceship) { spaceship.targetX = x; spaceship.targetY = y; }
+  };
+  window.releaseSpaceship = function() {
+    if (spaceship) spaceship.active = false;
+  };
+
   function draw(timestamp) {
     const dt = lastTimestamp === null ? 1 / 60 : Math.min(0.1, (timestamp - lastTimestamp) / 1000);
     lastTimestamp = timestamp;
@@ -532,8 +739,8 @@
 
     bgStars.forEach(s => {
       let drawX = s.x, drawY = s.y;
-      if (blackHole) {
-        const pos = lensedPos(s.x, s.y, blackHole);
+      if (blackHole || dyingBlackHoles.length) {
+        const pos = applyAllLensing(s.x, s.y);
         if (!pos) return;
         drawX = pos.x; drawY = pos.y;
       }
@@ -545,8 +752,8 @@
     });
     conStars.forEach(s => {
       let drawX = s.x, drawY = s.y;
-      if (blackHole) {
-        const pos = lensedPos(s.x, s.y, blackHole);
+      if (blackHole || dyingBlackHoles.length) {
+        const pos = applyAllLensing(s.x, s.y);
         if (!pos) return;
         drawX = pos.x; drawY = pos.y;
       }
@@ -599,9 +806,9 @@
         const sa = conStars[con.indices[i]];
         const sb = conStars[con.indices[j]];
         let ax = sa.x, ay = sa.y, bx = sb.x, by = sb.y;
-        if (blackHole) {
-          const pa = lensedPos(sa.x, sa.y, blackHole);
-          const pb = lensedPos(sb.x, sb.y, blackHole);
+        if (blackHole || dyingBlackHoles.length) {
+          const pa = applyAllLensing(sa.x, sa.y);
+          const pb = applyAllLensing(sb.x, sb.y);
           if (!pa || !pb) continue;
           ax = pa.x; ay = pa.y; bx = pb.x; by = pb.y;
         }
@@ -616,8 +823,8 @@
         for (const idx of con.indices) {
           const s = conStars[idx];
           let sx = s.x, sy = s.y;
-          if (blackHole) {
-            const pos = lensedPos(s.x, s.y, blackHole);
+          if (blackHole || dyingBlackHoles.length) {
+            const pos = applyAllLensing(s.x, s.y);
             if (pos) { sx = pos.x; sy = pos.y; }
           }
           centX += sx;
@@ -629,6 +836,14 @@
     }
 
     ctx.globalAlpha = 1;
+
+    for (let i = dyingBlackHoles.length - 1; i >= 0; i--) {
+      const bh = dyingBlackHoles[i];
+      bh.age      += dt;
+      bh.rotation += dt * 2.8;
+      drawBlackHole(bh);
+      if (bh.age >= bh.maxAge) dyingBlackHoles.splice(i, 1);
+    }
 
     if (blackHole) {
       blackHole.age      += dt;
@@ -642,6 +857,11 @@
       }
       if (blackHole.age >= blackHole.maxAge) blackHole = null;
     }
+
+    updateSmoke(dt);
+    drawSmoke();
+    updateSpaceship(dt);
+    drawSpaceship();
 
     if (shooting) {
       const tailX = shooting.x - shooting.dx * shooting.tail;
@@ -710,24 +930,81 @@
   document.addEventListener('pointerdown', e => {
     if (!notGlobe(e)) return;
     mouseX = e.clientX; mouseY = e.clientY;
-    const now = Date.now();
-    clickTimes.push(now);
-    if (clickTimes.length > 3) clickTimes.shift();
-    if (clickTimes.length === 3 && now - clickTimes[0] < 600) {
-      spawnBlackHole(e.clientX, e.clientY);
-      clickTimes.length = 0;
-    }
   });
   document.addEventListener('pointerup',    () => { mouseX = -1; mouseY = -1; });
 
   // Prevent mobile scroll and pinch-zoom across the whole page.
   // CSS overflow:hidden + overscroll-behavior don't stop iOS Safari's elastic
   // scroll; a non-passive touchmove listener with preventDefault() does.
-  document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove',   e => e.preventDefault(), { passive: false });
+  // Suppress the long-press context menu (right-click equivalent) on iOS and Android.
+  // Without this, holding a finger on the canvas or gadget slots triggers the native
+  // share/copy sheet and interrupts pointer capture mid-drag.
+  document.addEventListener('contextmenu', e => e.preventDefault());
   if ('ongesturestart' in window) {
     document.addEventListener('gesturestart',  e => e.preventDefault(), { passive: false });
     document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
   }
 
   start();
+})();
+
+// ── Gadget Inventory ─────────────────────────────────────────────
+(function () {
+  const inventory = document.getElementById('gadget-inventory');
+  if (!inventory) return;
+
+  // Gadget drag — each gadget type has its own drag behaviour
+  let ghost     = null;
+  let gadgetType = null;
+
+  function cancelDrag() {
+    if (ghost) { ghost.remove(); ghost = null; }
+    if (gadgetType === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
+    gadgetType = null;
+  }
+
+  inventory.querySelectorAll('.gadget-slot').forEach(slot => {
+    slot.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      gadgetType = slot.dataset.gadget;
+
+      if (gadgetType === 'blackhole') {
+        ghost = document.createElement('div');
+        ghost.className = 'gadget-drag-ghost';
+        ghost.dataset.gadget = 'blackhole';
+        ghost.style.left = e.clientX + 'px';
+        ghost.style.top  = e.clientY + 'px';
+        document.body.appendChild(ghost);
+      } else if (gadgetType === 'spaceship') {
+        window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+      }
+
+      slot.setPointerCapture(e.pointerId);
+    });
+
+    slot.addEventListener('pointermove', e => {
+      if (gadgetType === 'blackhole' && ghost) {
+        ghost.style.left = e.clientX + 'px';
+        ghost.style.top  = e.clientY + 'px';
+      } else if (gadgetType === 'spaceship') {
+        window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+      }
+    });
+
+    slot.addEventListener('pointerup', e => {
+      if (gadgetType === 'blackhole') {
+        if (ghost) { ghost.remove(); ghost = null; }
+        const over = document.elementFromPoint(e.clientX, e.clientY);
+        if (!inventory.contains(over) && window.spawnBlackHole) {
+          window.spawnBlackHole(e.clientX, e.clientY);
+        }
+      } else if (gadgetType === 'spaceship') {
+        window.releaseSpaceship && window.releaseSpaceship();
+      }
+      gadgetType = null;
+    });
+
+    slot.addEventListener('pointercancel', cancelDrag);
+  });
 })();

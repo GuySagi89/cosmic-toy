@@ -5,6 +5,7 @@ html {
   background: #0d0d1a;
   height: 100%;
   overflow: hidden;
+  -webkit-touch-callout: none;
 }
 
 :root {
@@ -33,6 +34,7 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
+  -webkit-touch-callout: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -44,7 +46,7 @@ body {
   display: block;
   width:  min(500px, 72vmin);   /* mobile-first: compact */
   height: min(500px, 72vmin);
-  cursor: grab;
+  cursor: default;
   touch-action: none;
   filter:
     drop-shadow(0 0 18px rgba(130, 50, 240, 0.50))
@@ -59,4 +61,182 @@ body {
   }
 }
 
-#globe-canvas:active { cursor: grabbing; }
+
+/* ── Gadget Inventory ── */
+
+/* Mobile-first: horizontal bar pinned to the bottom center */
+#gadget-inventory {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(7, 4, 26, 0.84);
+  border: 1px solid rgba(130, 100, 255, 0.32);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(100, 60, 220, 0.18), inset 0 0 14px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Desktop: vertical bar pinned to bottom-right */
+@media (min-width: 600px) and (min-height: 600px) {
+  #gadget-inventory {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    transform: none;
+    flex-direction: column;
+    padding: 10px 8px;
+    border-radius: 18px;
+  }
+}
+
+.gadget-slot {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.gadget-slot:active { cursor: grabbing; }
+
+#gadget-blackhole {
+  background: radial-gradient(circle at 38% 38%, #1a004a 0%, #000000 55%);
+  box-shadow:
+    0 0 0 1px rgba(180, 140, 255, 0.35),
+    0 0 12px 4px rgba(150, 90, 255, 0.50),
+    inset 0 0 10px rgba(0, 0, 0, 0.95);
+  transition: box-shadow 0.22s ease;
+}
+
+#gadget-blackhole:hover {
+  box-shadow:
+    0 0 0 1px rgba(210, 180, 255, 0.60),
+    0 0 22px 7px rgba(180, 110, 255, 0.72),
+    inset 0 0 10px rgba(0, 0, 0, 0.95);
+}
+
+#gadget-spaceship {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 55%, rgba(44, 22, 88, 0.65) 0%, rgba(6, 3, 16, 0.80) 70%);
+  box-shadow:
+    0 0 0 1px rgba(140, 108, 220, 0.28),
+    0 0 10px 2px rgba(120, 78, 200, 0.22);
+  transition: box-shadow 0.22s ease;
+}
+
+#gadget-spaceship:hover {
+  box-shadow:
+    0 0 0 1px rgba(180, 150, 255, 0.52),
+    0 0 18px 5px rgba(150, 100, 242, 0.46);
+}
+
+.gadget-ship-icon {
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(180, 150, 255, 0.55));
+  transition: filter 0.22s ease;
+}
+
+#gadget-spaceship:hover .gadget-ship-icon {
+  filter: drop-shadow(0 0 6px rgba(200, 175, 255, 0.85));
+}
+
+/* ── Gadget tooltip ── */
+.gadget-tooltip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 14px;
+  background: linear-gradient(160deg, rgba(14, 6, 42, 0.97), rgba(6, 3, 20, 0.97));
+  border: 1px solid rgba(155, 105, 255, 0.48);
+  border-radius: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  box-shadow:
+    0 0 14px rgba(130, 70, 255, 0.28),
+    0 6px 20px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(210, 180, 255, 0.07);
+  z-index: 101;
+}
+
+.gadget-slot:hover .gadget-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.gadget-tooltip-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(218, 205, 255, 0.96);
+}
+
+.gadget-tooltip-hint {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: rgba(140, 118, 195, 0.72);
+}
+
+/* Arrow — border layer */
+.gadget-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(155, 105, 255, 0.48);
+}
+
+/* Arrow — fill layer */
+.gadget-tooltip::after {
+  content: '';
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(6, 3, 20, 0.97);
+}
+
+/* ── Drag ghost ── */
+.gadget-drag-ghost {
+  position: fixed;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  opacity: 0.82;
+}
+
+.gadget-drag-ghost[data-gadget="blackhole"] {
+  background: radial-gradient(circle at 38% 38%, #1a004a 0%, #000000 55%);
+  box-shadow:
+    0 0 0 1px rgba(200, 170, 255, 0.55),
+    0 0 24px 8px rgba(180, 110, 255, 0.65),
+    inset 0 0 10px rgba(0, 0, 0, 0.95);
+}
