@@ -683,9 +683,14 @@
     });
 
     window.addEventListener('comet-globe-impact', e => {
-      const { x: impX, y: impY } = e.detail;
+      const { x: impX, y: impY, vx, vy } = e.detail;
       const rect = canvas.getBoundingClientRect();
       snapStartTime = Date.now();
+
+      // Convert impact screen pos to canvas coords, find nearest front-hemisphere vertex for ripple
+      const icx = (impX - rect.left) * (W / rect.width);
+      const icy = (impY - rect.top)  * (H / rect.height);
+      let nearest = null, bestDist = Infinity;
       for (const v of vertices) {
         const vsx  = rect.left + (v.projX / W) * rect.width;
         const vsy  = rect.top  + (v.projY / H) * rect.height;
@@ -698,12 +703,29 @@
         v._snapDY0  = v.driftY;
         v.snapping  = true;
         v.dragWeight = 0;
+        if (v._rz < 0) {
+          const d = Math.hypot(v.projX - icx, v.projY - icy);
+          if (d < bestDist) { bestDist = d; nearest = v; }
+        }
       }
-      rotSpeed += 0.02;
+      if (nearest) {
+        ripple = { startTime: Date.now(), ox: nearest.x0, oy: nearest.y0, oz: nearest.z0, amp: 14 };
+      }
+
+      // Spin direction driven by horizontal momentum: leftward hit → positive spin (right side moves left)
+      const speed = Math.hypot(vx, vy) || 1;
+      rotSpeed += (-vx / speed) * 0.03;
     });
 
-    window.addEventListener('comet-moon-impact', () => {
-      moonOrbitSpeed += 0.04 * (Math.random() < 0.5 ? 1 : -1);
+    window.addEventListener('comet-moon-impact', e => {
+      const { vx, vy } = e.detail;
+      const speed = Math.hypot(vx, vy) || 1;
+      // Project comet velocity onto the moon's orbital tangent to get directional push
+      const tangX = -Math.sin(moonOrbitAngle);
+      const tangY = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
+      const tangLen = Math.hypot(tangX, tangY) || 1;
+      const proj = (vx * tangX + vy * tangY) / (speed * tangLen);
+      moonOrbitSpeed += proj * 0.08;
     });
 
     window.getMoonScreenPos = function () {

@@ -238,7 +238,7 @@
   let dyingBlackHoles = [];
   let spaceship = null;
   let smokeParticles = [];
-  let comet   = null;
+  let comets  = [];
 
   function buildBackground() {
     bgGrad = ctx.createRadialGradient(
@@ -624,6 +624,70 @@
       while (spaceship.emitAccum >= 1) { emitSmoke(); spaceship.emitAccum--; }
     }
 
+    // Bounce cooldown (gates effects only — not the hard boundary)
+    if (spaceship.bounceCD > 0) spaceship.bounceCD -= dt;
+
+    // Globe solid boundary
+    const globeEl = document.getElementById('globe-canvas');
+    if (globeEl) {
+      const gr     = globeEl.getBoundingClientRect();
+      const gcx    = gr.left + gr.width  / 2;
+      const gcy    = gr.top  + gr.height / 2;
+      const globeR = gr.width * 0.22;
+      const bdx    = spaceship.x - gcx, bdy = spaceship.y - gcy;
+      const bdist  = Math.hypot(bdx, bdy);
+      if (bdist < globeR + 8) {
+        const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
+        // Always push position to surface
+        spaceship.x = gcx + nx * (globeR + 8);
+        spaceship.y = gcy + ny * (globeR + 8);
+        const dot = spaceship.vx * nx + spaceship.vy * ny;
+        if (spaceship.bounceCD <= 0) {
+          // First contact: full reflection + effects
+          if (dot < 0) {
+            const inVx = spaceship.vx, inVy = spaceship.vy;
+            spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
+            spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
+            spawnImpactDebris(spaceship.x, spaceship.y);
+            window.dispatchEvent(new CustomEvent('comet-globe-impact',
+              { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy } }));
+          }
+          spaceship.bounceCD = 0.5;
+        } else if (dot < 0) {
+          // Sustained contact: strip the inward component so drag can't push through
+          spaceship.vx -= dot * nx;
+          spaceship.vy -= dot * ny;
+        }
+      }
+    }
+
+    // Moon solid boundary
+    if (window.getMoonScreenPos) {
+      const m     = window.getMoonScreenPos();
+      const bdx   = spaceship.x - m.x, bdy = spaceship.y - m.y;
+      const bdist = Math.hypot(bdx, bdy);
+      if (bdist < m.r + 8) {
+        const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
+        spaceship.x = m.x + nx * (m.r + 8);
+        spaceship.y = m.y + ny * (m.r + 8);
+        const dot = spaceship.vx * nx + spaceship.vy * ny;
+        if (spaceship.bounceCD <= 0) {
+          if (dot < 0) {
+            const inVx = spaceship.vx, inVy = spaceship.vy;
+            spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
+            spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
+            spawnImpactDebris(spaceship.x, spaceship.y);
+            window.dispatchEvent(new CustomEvent('comet-moon-impact',
+              { detail: { vx: inVx, vy: inVy } }));
+          }
+          spaceship.bounceCD = 0.5;
+        } else if (dot < 0) {
+          spaceship.vx -= dot * nx;
+          spaceship.vy -= dot * ny;
+        }
+      }
+    }
+
     if (!spaceship.active) {
       spaceship.alpha = Math.max(0, spaceship.alpha - dt * 1.3);
       if (spaceship.alpha <= 0) { spaceship = null; return; }
@@ -648,7 +712,7 @@
     smokeParticles.forEach(p => {
       const frac  = 1 - p.life / p.maxLife;
       const alpha = (p.life / p.maxLife) * (p.core ? 0.78 : 0.48);
-      const r     = p.r * (1 + frac * 2.8);
+      const r     = Math.max(0.01, p.r * (1 + frac * 2.8));
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
       if (p.comet) {
         g.addColorStop(0,   `rgba(180, 240, 255, ${alpha})`);
@@ -750,7 +814,7 @@
   }
 
   window.startSpaceship = function(x, y) {
-    spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0 };
+    spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0 };
   };
   window.updateSpaceshipTarget = function(x, y) {
     if (spaceship) { spaceship.targetX = x; spaceship.targetY = y; }
@@ -784,7 +848,8 @@
 
   // ── Comet ────────────────────────────────────────────────────────
   function spawnComet(x, y, vx, vy) {
-    comet = { x, y, vx, vy, age: 0, maxAge: 4.5, dead: false };
+    if (comets.length >= 5) blastComet(comets.shift(), x, y);
+    comets.push({ x, y, vx, vy, age: 0, maxAge: 4.5, dead: false });
   }
   window.spawnComet = spawnComet;
 
@@ -795,129 +860,165 @@
       smokeParticles.push({
         x, y,
         vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
-        life: 0.3 + Math.random() * 0.4, maxLife: 0.5,
+        life: 0.3 + Math.random() * 0.2, maxLife: 0.5,
         r: 2 + Math.random() * 3,
         core: Math.random() < 0.5, comet: true,
       });
     }
   }
 
-  function updateComet(dt) {
-    if (!comet || comet.dead) { comet = null; return; }
-    comet.age += dt;
-
-    // BH gravity pull + absorption
-    const allBHs = blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles];
-    for (const bh of allBHs) {
-      const dx = bh.x - comet.x, dy = bh.y - comet.y;
-      const d  = Math.hypot(dx, dy);
-      if (d < bh.baseRadius * 1.2) { comet = null; return; }
-      if (d < bh.baseRadius * 20) {
-        const g = 18000 / (d * d);
-        comet.vx += (dx / d) * g * dt;
-        comet.vy += (dy / d) * g * dt;
-      }
-    }
-
-    comet.x += comet.vx * dt;
-    comet.y += comet.vy * dt;
-
-    // Trail particles
-    if (smokeParticles.length < 400) {
-      const spd = Math.hypot(comet.vx, comet.vy) || 1;
-      const bx  = -comet.vx / spd, by = -comet.vy / spd;
-      for (let i = 0; i < 3; i++) {
-        const spread = (Math.random() - 0.5) * 0.8;
+  function blastComet(c, srcX, srcY) {
+    const dx = c.x - srcX, dy = c.y - srcY;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist, ny = dy / dist;
+    for (let i = 0; i < 18; i++) {
+      let sdx, sdy;
+      if (i < 13) {
+        const spread = (Math.random() - 0.5) * Math.PI * 1.4;
         const cs = Math.cos(spread), ss = Math.sin(spread);
-        smokeParticles.push({
-          x: comet.x + bx * 6 + (Math.random() - 0.5) * 4,
-          y: comet.y + by * 6 + (Math.random() - 0.5) * 4,
-          vx: (bx * cs - by * ss) * (20 + Math.random() * 30),
-          vy: (bx * ss + by * cs) * (20 + Math.random() * 30),
-          life: 0.25 + Math.random() * 0.25,
-          maxLife: 0.4,
-          r: 1.5 + Math.random() * 2,
-          core: Math.random() < 0.4,
-          comet: true,
-        });
+        sdx = nx * cs - ny * ss;
+        sdy = nx * ss + ny * cs;
+      } else {
+        const a = Math.random() * Math.PI * 2;
+        sdx = Math.cos(a); sdy = Math.sin(a);
       }
+      const spd     = 110 + Math.random() * 270;
+      const maxLife = 0.28 + Math.random() * 0.32;
+      smokeParticles.push({
+        x: c.x + (Math.random() - 0.5) * 14,
+        y: c.y + (Math.random() - 0.5) * 14,
+        vx: sdx * spd, vy: sdy * spd,
+        life: maxLife, maxLife,
+        r: 1.5 + Math.random() * 2.5,
+        core: Math.random() < 0.6, comet: true,
+      });
     }
+  }
 
-    // Lifetime / off-screen
-    const margin = 120;
-    if (comet.age > comet.maxAge ||
-        comet.x < -margin || comet.x > canvas.width  + margin ||
-        comet.y < -margin || comet.y > canvas.height + margin) {
-      comet = null; return;
-    }
+  function blastCometFromBH(bhX, bhY) {
+    for (const c of comets) blastComet(c, bhX, bhY);
+    comets = [];
+  }
 
-    // Collision: Globe
+  function updateComet(dt) {
+    const allBHs  = blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles];
     const globeEl = document.getElementById('globe-canvas');
-    if (globeEl) {
-      const gr   = globeEl.getBoundingClientRect();
-      const gcx  = gr.left + gr.width  / 2;
-      const gcy  = gr.top  + gr.height / 2;
-      if (Math.hypot(comet.x - gcx, comet.y - gcy) < gr.width * 0.42) {
-        window.dispatchEvent(new CustomEvent('comet-globe-impact',
-          { detail: { x: comet.x, y: comet.y } }));
-        spawnImpactDebris(comet.x, comet.y);
-        comet = null; return;
-      }
-    }
+    const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
+    const moon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+    const margin  = 120;
 
-    // Collision: Moon
-    if (window.getMoonScreenPos) {
-      const m = window.getMoonScreenPos();
-      if (Math.hypot(comet.x - m.x, comet.y - m.y) < m.r * 2.2) {
-        window.dispatchEvent(new CustomEvent('comet-moon-impact', { detail: {} }));
-        spawnImpactDebris(comet.x, comet.y);
-        comet = null; return;
-      }
-    }
+    for (let i = comets.length - 1; i >= 0; i--) {
+      const c = comets[i];
+      c.age += dt;
 
-    // Collision: Spaceship
-    if (spaceship && !spaceship.exploding) {
-      if (Math.hypot(comet.x - spaceship.x, comet.y - spaceship.y) < 22) {
+      // BH gravity pull + absorption
+      let absorbed = false;
+      for (const bh of allBHs) {
+        const dx = bh.x - c.x, dy = bh.y - c.y;
+        const d  = Math.hypot(dx, dy);
+        if (d < bh.baseRadius * 1.2) { absorbed = true; break; }
+        if (d < bh.baseRadius * 20) {
+          const g = 18000 / (d * d);
+          c.vx += (dx / d) * g * dt;
+          c.vy += (dy / d) * g * dt;
+        }
+      }
+      if (absorbed) { comets.splice(i, 1); continue; }
+
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+
+      // Trail particles
+      if (smokeParticles.length < 600) {
+        const spd = Math.hypot(c.vx, c.vy) || 1;
+        const bx  = -c.vx / spd, by = -c.vy / spd;
+        for (let j = 0; j < 3; j++) {
+          const spread = (Math.random() - 0.5) * 0.8;
+          const cs = Math.cos(spread), ss = Math.sin(spread);
+          smokeParticles.push({
+            x: c.x + bx * 6 + (Math.random() - 0.5) * 4,
+            y: c.y + by * 6 + (Math.random() - 0.5) * 4,
+            vx: (bx * cs - by * ss) * (20 + Math.random() * 30),
+            vy: (bx * ss + by * cs) * (20 + Math.random() * 30),
+            life: 0.25 + Math.random() * 0.25,
+            maxLife: 0.4,
+            r: 1.5 + Math.random() * 2,
+            core: Math.random() < 0.4,
+            comet: true,
+          });
+        }
+      }
+
+      // Lifetime / off-screen
+      if (c.age > c.maxAge ||
+          c.x < -margin || c.x > canvas.width  + margin ||
+          c.y < -margin || c.y > canvas.height + margin) {
+        comets.splice(i, 1); continue;
+      }
+
+      // Collision: Globe
+      if (gr) {
+        const gcx = gr.left + gr.width  / 2;
+        const gcy = gr.top  + gr.height / 2;
+        if (Math.hypot(c.x - gcx, c.y - gcy) < gr.width * 0.22) {
+          window.dispatchEvent(new CustomEvent('comet-globe-impact',
+            { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy } }));
+          spawnImpactDebris(c.x, c.y);
+          comets.splice(i, 1); continue;
+        }
+      }
+
+      // Collision: Moon
+      if (moon && Math.hypot(c.x - moon.x, c.y - moon.y) < moon.r * 1.4) {
+        window.dispatchEvent(new CustomEvent('comet-moon-impact', { detail: { vx: c.vx, vy: c.vy } }));
+        spawnImpactDebris(c.x, c.y);
+        comets.splice(i, 1); continue;
+      }
+
+      // Collision: Spaceship
+      if (spaceship && !spaceship.exploding &&
+          Math.hypot(c.x - spaceship.x, c.y - spaceship.y) < 22) {
         triggerShipExplosion();
-        spawnImpactDebris(comet.x, comet.y);
-        comet = null; return;
+        spawnImpactDebris(c.x, c.y);
+        comets.splice(i, 1); continue;
       }
     }
   }
 
   function drawComet() {
-    if (!comet) return;
-    const spd = Math.hypot(comet.vx, comet.vy);
-    if (spd < 1) return;
-    const nx = comet.vx / spd, ny = comet.vy / spd;
+    for (const c of comets) {
+      const spd = Math.hypot(c.vx, c.vy);
+      if (spd < 1) continue;
+      const nx = c.vx / spd, ny = c.vy / spd;
 
-    ctx.save();
-    const tailLen = Math.min(60, spd * 0.1);
-    const tx = comet.x - nx * tailLen, ty = comet.y - ny * tailLen;
+      ctx.save();
+      const tailLen = Math.min(60, spd * 0.1);
+      const tx = c.x - nx * tailLen, ty = c.y - ny * tailLen;
 
-    const tailGrad = ctx.createLinearGradient(comet.x, comet.y, tx, ty);
-    tailGrad.addColorStop(0,   'rgba(220, 240, 255, 0.80)');
-    tailGrad.addColorStop(0.3, 'rgba(100, 220, 255, 0.45)');
-    tailGrad.addColorStop(1,   'rgba(60, 140, 255, 0)');
-    ctx.strokeStyle = tailGrad;
-    ctx.lineWidth   = 3.5;
-    ctx.lineCap     = 'round';
-    ctx.beginPath();
-    ctx.moveTo(comet.x, comet.y);
-    ctx.lineTo(tx, ty);
-    ctx.stroke();
+      const tailGrad = ctx.createLinearGradient(c.x, c.y, tx, ty);
+      tailGrad.addColorStop(0,   'rgba(220, 240, 255, 0.80)');
+      tailGrad.addColorStop(0.3, 'rgba(100, 220, 255, 0.45)');
+      tailGrad.addColorStop(1,   'rgba(60, 140, 255, 0)');
+      ctx.strokeStyle = tailGrad;
+      ctx.lineWidth   = 3.5;
+      ctx.lineCap     = 'round';
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
 
-    ctx.shadowColor = 'rgba(160, 240, 255, 1)';
-    ctx.shadowBlur  = 18;
-    const coreGrad = ctx.createRadialGradient(comet.x, comet.y, 0, comet.x, comet.y, 10);
-    coreGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
-    coreGrad.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
-    coreGrad.addColorStop(1,   'rgba(60, 160, 255, 0)');
-    ctx.fillStyle = coreGrad;
-    ctx.beginPath();
-    ctx.arc(comet.x, comet.y, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+      ctx.shadowColor = 'rgba(160, 240, 255, 1)';
+      ctx.shadowBlur  = 18;
+      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 10);
+      coreGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
+      coreGrad.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
+      coreGrad.addColorStop(1,   'rgba(60, 160, 255, 0)');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   function draw(timestamp) {
@@ -1117,6 +1218,7 @@
   }
 
   window.addEventListener('resize', () => { if (active) resize(); });
+  window.addEventListener('blackhole-explode', e => blastCometFromBH(e.detail.x, e.detail.y));
 
   // Skip events that originate from the globe canvas — pointer capture makes those
   // bubble to document even mid-drag, which would falsely trigger constellation hover.
