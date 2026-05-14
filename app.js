@@ -647,6 +647,20 @@
       return;
     }
 
+    if (spaceship.swirl) {
+      const sw = spaceship.swirl;
+      sw.age += dt;
+      const frac = sw.age / sw.maxAge;
+      if (frac >= 1) { spaceship = null; return; }
+      const r     = sw.r * Math.pow(1 - frac, 0.65);
+      sw.angle   += (3 + frac * 10) * dt;
+      spaceship.x     = sw.bh.x + Math.cos(sw.angle) * r;
+      spaceship.y     = sw.bh.y + Math.sin(sw.angle) * r;
+      spaceship.angle = sw.angle + Math.PI / 2;
+      spaceship.alpha = 1 - Math.pow(frac, 0.6);
+      return;
+    }
+
     if (spaceship.active) {
       const dx = spaceship.targetX - spaceship.x;
       const dy = spaceship.targetY - spaceship.y;
@@ -709,6 +723,8 @@
             spawnImpactDebris(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-globe-impact',
               { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy } }));
+            spaceship.hits++;
+            if (spaceship.hits >= 10) triggerShipExplosion();
           }
           spaceship.bounceCD = 0.5;
         } else if (dot < 0) {
@@ -737,6 +753,8 @@
             spawnImpactDebris(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-moon-impact',
               { detail: { vx: inVx, vy: inVy } }));
+            spaceship.hits++;
+            if (spaceship.hits >= 10) triggerShipExplosion();
           }
           spaceship.bounceCD = 0.5;
         } else if (dot < 0) {
@@ -801,37 +819,103 @@
       const prog    = spaceship.explodeAge / spaceship.explodeMaxAge;
       const easeOut = t => 1 - Math.pow(1 - t, 3);
 
+      // Broad radial flash
       const flashPeak = Math.sin(prog * Math.PI);
       if (flashPeak > 0.01) {
-        const flash = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 68);
-        flash.addColorStop(0,    `rgba(255, 248, 255, ${flashPeak * 0.92})`);
-        flash.addColorStop(0.10, `rgba(225, 185, 255, ${flashPeak * 0.58})`);
-        flash.addColorStop(0.38, `rgba(145,  95, 255, ${flashPeak * 0.24})`);
+        const flash = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 145);
+        flash.addColorStop(0,    `rgba(255, 252, 255, ${flashPeak * 0.98})`);
+        flash.addColorStop(0.06, `rgba(255, 215, 255, ${flashPeak * 0.74})`);
+        flash.addColorStop(0.22, `rgba(175,  95, 255, ${flashPeak * 0.40})`);
+        flash.addColorStop(0.55, `rgba(100,  45, 200, ${flashPeak * 0.16})`);
         flash.addColorStop(1,    'rgba(0, 0, 0, 0)');
         ctx.fillStyle = flash;
         ctx.beginPath();
-        ctx.arc(spaceship.x, spaceship.y, 68, 0, Math.PI * 2);
+        ctx.arc(spaceship.x, spaceship.y, 145, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      const waveR = easeOut(prog) * 92;
+      // Primary shockwave ring
+      const wave1R = easeOut(prog) * 230;
       ctx.beginPath();
-      ctx.arc(spaceship.x, spaceship.y, waveR, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(220, 192, 255, ${(1 - prog) * 0.88})`;
-      ctx.lineWidth   = 3.5 * (1 - prog) + 0.4;
-      ctx.shadowColor = 'rgba(200, 170, 255, 1)';
-      ctx.shadowBlur  = 22;
+      ctx.arc(spaceship.x, spaceship.y, wave1R, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(230, 200, 255, ${(1 - prog) * 0.92})`;
+      ctx.lineWidth   = 5.5 * (1 - prog) + 0.4;
+      ctx.shadowColor = 'rgba(215, 180, 255, 1)';
+      ctx.shadowBlur  = 32;
       ctx.stroke();
       ctx.shadowBlur  = 0;
+
+      // Secondary shockwave — launches slightly after primary, stays smaller
+      if (prog > 0.12) {
+        const p2     = (prog - 0.12) / 0.88;
+        const wave2R = easeOut(p2) * 165;
+        ctx.beginPath();
+        ctx.arc(spaceship.x, spaceship.y, wave2R, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(200, 158, 255, ${(1 - p2) * 0.58})`;
+        ctx.lineWidth   = 3.2 * (1 - p2) + 0.3;
+        ctx.shadowColor = 'rgba(190, 148, 255, 1)';
+        ctx.shadowBlur  = 18;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+      }
     }
+
+    // Damage colour state — sample time once for the whole draw call
+    const hits    = spaceship.hits;
+    const hitFrac = Math.min(hits / 9, 1);
+    const now     = Date.now();
+    const cl = (a, b, t) => Math.round(a + (b - a) * t);
+    let fl = 0, warnFreq = 0;
+    if (hits >= 7) {
+      warnFreq = [0.7, 1.3, 2.2][Math.min(hits - 7, 2)];
+      fl = (Math.sin(now / 1000 * warnFreq * Math.PI * 2) + 1) / 2;
+    }
+    // Hull gradient: purple → red → blinding flash-red
+    const topR = cl(cl(192, 255, hitFrac), 255, fl * 0.92);
+    const topG = cl(cl(162,  65, hitFrac),  15, fl * 0.92);
+    const topB = cl(cl(255,  65, hitFrac),  15, fl * 0.92);
+    const midR = cl(cl(126, 215, hitFrac), 255, fl * 0.92);
+    const midG = cl(cl( 90,  35, hitFrac),   5, fl * 0.92);
+    const midB = cl(cl(228,  35, hitFrac),   5, fl * 0.92);
+    const botR = cl(cl( 78, 170, hitFrac), 220, fl * 0.92);
+    const botG = cl(cl( 55,  18, hitFrac),   2, fl * 0.92);
+    const botB = cl(cl(180,  18, hitFrac),   2, fl * 0.92);
+    const glR  = cl(cl(158, 255, hitFrac), 255, fl);
+    const glG  = cl(cl(118,  45, hitFrac),   0, fl);
+    const glB  = cl(cl(255,  45, hitFrac),   0, fl);
+    const stR  = cl(220, 255, hitFrac);
+    const stG  = cl(208, 140, hitFrac);
+    const stB  = cl(255, 140, hitFrac);
 
     ctx.globalAlpha = spaceship.alpha;
     ctx.translate(spaceship.x, spaceship.y);
+
+    // Warning rings — drawn before rotate so they stay screen-aligned (circles are invariant, but
+    // this keeps the shadow state isolated before hull drawing)
+    if (hits >= 7) {
+      const period   = 1000 / warnFreq;
+      const maxRingR = 55 + (hits - 7) * 14;
+      ctx.save();
+      for (let ri = 0; ri < 2; ri++) {
+        const phase  = ((now + ri * period * 0.5) % period) / period;
+        const ringR  = 14 + phase * maxRingR;
+        const rAlpha = (1 - phase) * (0.45 + fl * 0.45);
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 20, 20, ${rAlpha})`;
+        ctx.lineWidth   = (1 - phase) * 5 + 0.5;
+        ctx.shadowColor = 'rgba(255, 0, 0, 1)';
+        ctx.shadowBlur  = 18;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     ctx.rotate(spaceship.angle);
 
-    // Body glow
-    ctx.shadowColor = 'rgba(158, 118, 255, 0.9)';
-    ctx.shadowBlur  = 14;
+    // Body glow — shifts purple → red, pulses hard on last 3 hits
+    ctx.shadowColor = `rgba(${glR}, ${glG}, ${glB}, 0.9)`;
+    ctx.shadowBlur  = 14 + (hits >= 7 ? fl * 28 : 0);
 
     // Hull polygon
     ctx.beginPath();
@@ -844,14 +928,14 @@
     ctx.closePath();
 
     const bg = ctx.createLinearGradient(0, -15, 0, 11);
-    bg.addColorStop(0,   'rgba(192, 162, 255, 0.97)');
-    bg.addColorStop(0.5, 'rgba(126,  90, 228, 0.93)');
-    bg.addColorStop(1,   'rgba( 78,  55, 180, 0.88)');
+    bg.addColorStop(0,   `rgba(${topR}, ${topG}, ${topB}, 0.97)`);
+    bg.addColorStop(0.5, `rgba(${midR}, ${midG}, ${midB}, 0.93)`);
+    bg.addColorStop(1,   `rgba(${botR}, ${botG}, ${botB}, 0.88)`);
     ctx.fillStyle = bg;
     ctx.fill();
 
     ctx.shadowBlur  = 0;
-    ctx.strokeStyle = 'rgba(220, 208, 255, 0.92)';
+    ctx.strokeStyle = `rgba(${stR}, ${stG}, ${stB}, 0.92)`;
     ctx.lineWidth   = 1.2;
     ctx.lineJoin    = 'round';
     ctx.stroke();
@@ -872,7 +956,7 @@
   }
 
   window.startSpaceship = function(x, y) {
-    spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0 };
+    spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
   };
   window.updateSpaceshipTarget = function(x, y) {
     if (spaceship) { spaceship.targetX = x; spaceship.targetY = y; }
@@ -886,20 +970,36 @@
     spaceship.active        = false;
     spaceship.exploding     = true;
     spaceship.explodeAge    = 0;
-    spaceship.explodeMaxAge = 1.1;
-    const count = 26;
-    for (let i = 0; i < count; i++) {
-      const angle   = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.45;
-      const speed   = 90 + Math.random() * 200;
-      const maxLife = 0.55 + Math.random() * 0.55;
+    spaceship.explodeMaxAge = 1.8;
+
+    // Fast radial burst — sharp shard-like particles
+    for (let i = 0; i < 42; i++) {
+      const angle   = (Math.PI * 2 * i / 42) + (Math.random() - 0.5) * 0.55;
+      const speed   = 140 + Math.random() * 340;
+      const maxLife = 0.55 + Math.random() * 0.85;
       smokeParticles.push({
-        x: spaceship.x + (Math.random() - 0.5) * 10,
-        y: spaceship.y + (Math.random() - 0.5) * 10,
+        x: spaceship.x + (Math.random() - 0.5) * 12,
+        y: spaceship.y + (Math.random() - 0.5) * 12,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: maxLife, maxLife,
-        r: 3 + Math.random() * 4.5,
+        r: 3.5 + Math.random() * 5.5,
         core: Math.random() < 0.55,
+      });
+    }
+    // Slow inner cloud — lingers behind the rings
+    for (let i = 0; i < 22; i++) {
+      const angle   = Math.random() * Math.PI * 2;
+      const speed   = 18 + Math.random() * 65;
+      const maxLife = 0.9 + Math.random() * 0.85;
+      smokeParticles.push({
+        x: spaceship.x + (Math.random() - 0.5) * 18,
+        y: spaceship.y + (Math.random() - 0.5) * 18,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: maxLife, maxLife,
+        r: 7 + Math.random() * 10,
+        core: false,
       });
     }
   }
@@ -964,19 +1064,35 @@
       const c = comets[i];
       c.age += dt;
 
-      // BH gravity pull + absorption
-      let absorbed = false;
+      // Comet already spiralling into a BH — animate until it reaches centre
+      if (c.swirl) {
+        const sw = c.swirl;
+        sw.age += dt;
+        const frac = sw.age / sw.maxAge;
+        if (frac >= 1) { comets.splice(i, 1); continue; }
+        const r   = sw.r * Math.pow(1 - frac, 0.65);
+        sw.angle += (3 + frac * 10) * dt;
+        c.x = sw.bh.x + Math.cos(sw.angle) * r;
+        c.y = sw.bh.y + Math.sin(sw.angle) * r;
+        c.swirlFrac = frac;
+        continue;
+      }
+
+      // BH gravity pull; enter swirl once inside the dark shadow zone
       for (const bh of allBHs) {
         const dx = bh.x - c.x, dy = bh.y - c.y;
         const d  = Math.hypot(dx, dy);
-        if (d < bh.baseRadius * 1.2) { absorbed = true; break; }
+        if (d < bh.baseRadius * 3) {
+          c.swirl = { bh, angle: Math.atan2(c.y - bh.y, c.x - bh.x), r: Math.max(d, 4), age: 0, maxAge: 0.75 };
+          break;
+        }
         if (d < bh.baseRadius * 20) {
           const g = 18000 / (d * d);
           c.vx += (dx / d) * g * dt;
           c.vy += (dy / d) * g * dt;
         }
       }
-      if (absorbed) { comets.splice(i, 1); continue; }
+      if (c.swirl) continue;
 
       c.x += c.vx * dt;
       c.y += c.vy * dt;
@@ -1028,11 +1144,12 @@
         comets.splice(i, 1); continue;
       }
 
-      // Collision: Spaceship
+      // Collision: Spaceship — deals 3 hits of damage
       if (spaceship && !spaceship.exploding &&
           Math.hypot(c.x - spaceship.x, c.y - spaceship.y) < 22) {
-        triggerShipExplosion();
+        spaceship.hits += 3;
         spawnImpactDebris(c.x, c.y);
+        if (spaceship.hits >= 10) triggerShipExplosion();
         comets.splice(i, 1); continue;
       }
     }
@@ -1040,6 +1157,27 @@
 
   function drawComet() {
     for (const c of comets) {
+      // Swirling into BH: draw only a shrinking core, no tail
+      if (c.swirl) {
+        const scale = Math.max(0, 1 - Math.pow(c.swirlFrac, 0.55));
+        if (scale < 0.02) continue;
+        const r = 10 * scale;
+        ctx.save();
+        ctx.globalAlpha = scale;
+        ctx.shadowColor = 'rgba(160, 240, 255, 1)';
+        ctx.shadowBlur  = 18 * scale;
+        const cg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
+        cg.addColorStop(0,   'rgba(255, 255, 255, 1)');
+        cg.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
+        cg.addColorStop(1,   'rgba(60, 160, 255, 0)');
+        ctx.fillStyle = cg;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
+
       const spd = Math.hypot(c.vx, c.vy);
       if (spd < 1) continue;
       const nx = c.vx / spd, ny = c.vy / spd;
