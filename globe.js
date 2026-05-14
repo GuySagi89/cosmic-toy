@@ -508,7 +508,12 @@
     canvas.addEventListener('pointermove', e => {
       if (e.buttons === 0 && dragVertex)  onRelease();
       if (e.buttons === 0 && moonDragging) releaseMoon();
-      const { x, y } = canvasCoords(e, canvas);
+      const raw = canvasCoords(e, canvas);
+      // Clamp to canvas bounds: with setPointerCapture the finger can slide off
+      // the canvas edge, producing out-of-range coords that stretch grid lines
+      // to the canvas corners ("smear" artifact on mobile).
+      const x = Math.max(0, Math.min(W, raw.x));
+      const y = Math.max(0, Math.min(H, raw.y));
 
       if (moonDragging) {
         const prev     = moonOrbitAngle;
