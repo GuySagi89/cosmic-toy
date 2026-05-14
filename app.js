@@ -240,7 +240,12 @@ function initStarField() {
   }
   const sessionDefs = generateSessionDefs();
 
-  const sessionNames = SILLY_NAMES.slice().sort(() => Math.random() - 0.5);
+  const sessionNames = (() => {
+    const names = SILLY_NAMES.slice().sort(() => Math.random() - 0.5);
+    // ~5 % chance per session that one constellation is the rare Yashi Pozmantiria
+    if (Math.random() < 0.05) names[Math.floor(Math.random() * 5)] = 'Yashi Pozmantiria';
+    return names;
+  })();
 
   let stars = [], constellations = [], shooting = null;
   let rafId = null, shootTimer = null, active = false, t = 0;
