@@ -44,152 +44,165 @@ function initStarField() {
     'The Magnificent Kerfuffle',
   ];
 
-  // 20 shapes — open paths/trees only (no closed polygons), one per screen region
-  const CONSTELLATION_DEFS = [
-    // ── top-left ──────────────────────────────────────────────────
-    // W / Cassiopeia zigzag
-    {
-      pts:   [[0.04,0.11],[0.09,0.05],[0.15,0.12],[0.21,0.05],[0.27,0.12]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // curved hook (6 stars)
-    {
-      pts:   [[0.06,0.24],[0.12,0.17],[0.19,0.13],[0.26,0.17],[0.29,0.24],[0.24,0.29]],
-      edges: [[0,1],[1,2],[2,3],[3,4],[4,5]],
-    },
-    // Y-fork
-    {
-      pts:   [[0.30,0.06],[0.34,0.13],[0.31,0.21],[0.40,0.10],[0.37,0.18]],
-      edges: [[0,1],[1,2],[1,3],[3,4]],
-    },
-    // ── top-right ─────────────────────────────────────────────────
-    // open arc (Big Dipper-like curve)
-    {
-      pts:   [[0.74,0.10],[0.79,0.05],[0.85,0.04],[0.91,0.07],[0.95,0.13],[0.93,0.21]],
-      edges: [[0,1],[1,2],[2,3],[3,4],[4,5]],
-    },
-    // zigzag
-    {
-      pts:   [[0.63,0.07],[0.68,0.03],[0.73,0.08],[0.78,0.03],[0.83,0.09]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // branching hook
-    {
-      pts:   [[0.89,0.05],[0.93,0.10],[0.96,0.16],[0.91,0.20],[0.84,0.18],[0.95,0.23]],
-      edges: [[0,1],[1,2],[2,3],[3,4],[2,5]],
-    },
-    // ── bottom-left ───────────────────────────────────────────────
-    // reversed J
-    {
-      pts:   [[0.07,0.65],[0.13,0.62],[0.20,0.65],[0.23,0.72],[0.18,0.79]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // upward fork
-    {
-      pts:   [[0.05,0.90],[0.09,0.94],[0.14,0.88],[0.10,0.81],[0.17,0.77],[0.20,0.84]],
-      edges: [[0,1],[1,2],[2,3],[3,4],[3,5]],
-    },
-    // zigzag with tail
-    {
-      pts:   [[0.25,0.65],[0.31,0.70],[0.37,0.65],[0.33,0.78],[0.27,0.84]],
-      edges: [[0,1],[1,2],[1,3],[3,4]],
-    },
-    // ── bottom-right ──────────────────────────────────────────────
-    // scorpion-tail curve
-    {
-      pts:   [[0.70,0.64],[0.76,0.67],[0.82,0.64],[0.87,0.68],[0.90,0.75],[0.85,0.82]],
-      edges: [[0,1],[1,2],[2,3],[3,4],[4,5]],
-    },
-    // bent arm
-    {
-      pts:   [[0.93,0.82],[0.96,0.76],[0.97,0.70],[0.93,0.65],[0.87,0.68]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // Y-branch
-    {
-      pts:   [[0.65,0.80],[0.70,0.75],[0.75,0.79],[0.79,0.86],[0.73,0.91],[0.69,0.85]],
-      edges: [[0,1],[1,2],[2,3],[2,4],[4,5]],
-    },
-    // ── left edge ────────────────────────────────────────────────
-    // kinked vertical chain
-    {
-      pts:   [[0.04,0.36],[0.09,0.41],[0.05,0.48],[0.09,0.55],[0.04,0.62]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // chain with side branch
-    {
-      pts:   [[0.03,0.55],[0.08,0.59],[0.05,0.66],[0.11,0.63],[0.07,0.71]],
-      edges: [[0,1],[1,2],[1,3],[3,4]],
-    },
-    // ── right edge ───────────────────────────────────────────────
-    // kinked vertical chain
-    {
-      pts:   [[0.93,0.36],[0.88,0.42],[0.93,0.48],[0.88,0.54],[0.93,0.61]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // chain with side branch
-    {
-      pts:   [[0.96,0.57],[0.91,0.61],[0.94,0.68],[0.88,0.65],[0.90,0.73]],
-      edges: [[0,1],[1,2],[1,3],[3,4]],
-    },
-    // ── top-centre ───────────────────────────────────────────────
-    // gentle arc
-    {
-      pts:   [[0.41,0.07],[0.46,0.03],[0.51,0.02],[0.57,0.04],[0.61,0.10]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // hooked L
-    {
-      pts:   [[0.44,0.16],[0.49,0.11],[0.55,0.07],[0.61,0.12],[0.58,0.19]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
-    // ── bottom-centre ─────────────────────────────────────────────
-    // ladle / hook
-    {
-      pts:   [[0.40,0.83],[0.46,0.87],[0.52,0.84],[0.57,0.89],[0.52,0.94],[0.44,0.93]],
-      edges: [[0,1],[1,2],[2,3],[3,4],[4,5]],
-    },
-    // zigzag chain
-    {
-      pts:   [[0.38,0.90],[0.44,0.85],[0.50,0.91],[0.56,0.85],[0.62,0.91]],
-      edges: [[0,1],[1,2],[2,3],[3,4]],
-    },
+  // ── Zone-based constellation generation ──────────────────────────────────
+  // Screen is divided into a strict 3×2 grid of non-overlapping zones.
+  // Each session picks 5 of 6 zones and grows one constellation per zone.
+  // Stars are placed randomly inside each zone's inner area so that edges
+  // (which connect only stars inside a convex rectangle) can never leave the
+  // zone — guaranteeing no overlap or line crossing between constellations.
+  // Within a constellation a non-crossing spanning tree is computed via
+  // Prim's nearest-neighbour with a segment-intersection guard.
+
+  const ZONES = [
+    [0.00, 0.00, 0.33, 0.50],  // top-left
+    [0.33, 0.00, 0.67, 0.50],  // top-center
+    [0.67, 0.00, 1.00, 0.50],  // top-right
+    [0.00, 0.50, 0.33, 1.00],  // bottom-left
+    [0.33, 0.50, 0.67, 1.00],  // bottom-center
+    [0.67, 0.50, 1.00, 1.00],  // bottom-right
   ];
 
-  // Regions ensure at most one constellation per screen zone — no overlaps
-  const REGIONS = [
-    [0,1,2],   // top-left
-    [3,4,5],   // top-right
-    [6,7,8],   // bottom-left
-    [9,10,11], // bottom-right
-    [12,13],   // left edge
-    [14,15],   // right edge
-    [16,17],   // top-centre
-    [18,19],   // bottom-centre
-  ];
+  function cross2D(ax, ay, bx, by) { return ax * by - ay * bx; }
 
-  // Pick 5 non-overlapping constellations: one per region, but skip any whose
-  // centroid is within MIN_DIST of an already-accepted one.
-  function pickSessionDefs() {
-    const MIN_DIST = 0.22;
-    function centroid(def) {
-      let sx = 0, sy = 0;
-      for (const [x, y] of def.pts) { sx += x; sy += y; }
-      return [sx / def.pts.length, sy / def.pts.length];
+  // True iff segment (pts[a]–pts[b]) properly crosses (pts[c]–pts[d]).
+  // Shared endpoints are never counted as crossings.
+  function segsCross(pts, a, b, c, d) {
+    if (a === c || a === d || b === c || b === d) return false;
+    const [ax, ay] = pts[a], [bx, by] = pts[b];
+    const [cx, cy] = pts[c], [dx, dy] = pts[d];
+    const d1 = cross2D(dx - cx, dy - cy, ax - cx, ay - cy);
+    const d2 = cross2D(dx - cx, dy - cy, bx - cx, by - cy);
+    const d3 = cross2D(bx - ax, by - ay, cx - ax, cy - ay);
+    const d4 = cross2D(bx - ax, by - ay, dx - ax, dy - ay);
+    return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+           ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+  }
+
+  // Nearest-neighbour open chain: walk star-to-star always picking the closest
+  // unvisited neighbour that doesn't cross an existing edge and isn't too far away.
+  // Result is a simple path — drawable in one stroke with no retracing.
+  function buildNonCrossingChain(pts, maxEdge = Infinity) {
+    if (pts.length <= 1) return [];
+    const visited = new Set([0]);
+    const edges   = [];
+    let   current = 0;
+
+    while (visited.size < pts.length) {
+      let bestDist = Infinity, bestNext = -1;
+      for (let b = 0; b < pts.length; b++) {
+        if (visited.has(b)) continue;
+        const d = Math.hypot(pts[current][0] - pts[b][0], pts[current][1] - pts[b][1]);
+        if (d >= bestDist || d > maxEdge) continue;
+        if (edges.every(([u, v]) => !segsCross(pts, current, b, u, v))) {
+          bestDist = d; bestNext = b;
+        }
+      }
+      if (bestNext === -1) break; // no reachable neighbour — stop here
+      edges.push([current, bestNext]);
+      visited.add(bestNext);
+      current = bestNext;
     }
-    const chosen = [], centroids = [];
-    for (const group of REGIONS.slice().sort(() => Math.random() - 0.5)) {
-      if (chosen.length >= 5) break;
-      const def = CONSTELLATION_DEFS[group[Math.floor(Math.random() * group.length)]];
-      const c = centroid(def);
-      if (centroids.every(([cx, cy]) => Math.hypot(c[0] - cx, c[1] - cy) >= MIN_DIST)) {
-        chosen.push(def);
-        centroids.push(c);
+
+    return edges;
+  }
+
+  // Add one closing edge to the chain to create a loop, while ensuring at least
+  // one open tail remains.  Prefers closing two interior nodes (both ends stay
+  // as tails).  Skips the edge that would close the two chain endpoints (full
+  // cycle = no tail at all).  Falls back to leaving the chain open if no valid
+  // non-crossing, non-endpoint-closing edge exists.
+  function addTailLoop(pts, chainEdges) {
+    if (chainEdges.length < 3) return [...chainEdges]; // too short to loop + tail
+
+    // Reconstruct the ordered sequence of pts indices along the chain.
+    const order = [chainEdges[0][0], ...chainEdges.map(e => e[1])];
+    const n = order.length;
+
+    const candidates = [];
+    for (let i = 0; i < n - 2; i++) {
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue; // would close full loop — no tail
+        const pi = order[i], pj = order[j];
+        if (chainEdges.every(([u, v]) => !segsCross(pts, pi, pj, u, v))) {
+          const bothInterior = i > 0 && j < n - 1;
+          const d = Math.hypot(pts[pi][0] - pts[pj][0], pts[pi][1] - pts[pj][1]);
+          candidates.push({ pi, pj, d, bothInterior });
+        }
       }
     }
-    return chosen;
+
+    if (candidates.length === 0) return [...chainEdges];
+
+    // Prefer closing between two interior nodes (keeps a tail at each end);
+    // among equals pick the shortest edge.
+    candidates.sort((a, b) =>
+      a.bothInterior !== b.bothInterior ? (a.bothInterior ? -1 : 1) : a.d - b.d
+    );
+
+    const { pi, pj } = candidates[0];
+    return [...chainEdges, [pi, pj]];
   }
-  const sessionDefs = pickSessionDefs();
+
+  function generateConstellationInZone([x0, y0, x1, y1]) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const exclPx = Math.min(340, Math.min(vw, vh) * 0.28);
+
+    const pw = x1 - x0, ph = y1 - y0;
+    const ix0 = x0 + pw * 0.12, ix1 = x1 - pw * 0.12;
+    const iy0 = y0 + ph * 0.10, iy1 = y1 - ph * 0.10;
+
+    const clusterR = 0.055 + Math.random() * 0.055; // 5.5–11 % of screen width
+    let clusterX, clusterY, centerFound = false;
+    for (let a = 0; a < 150; a++) {
+      const cx = ix0 + Math.random() * (ix1 - ix0);
+      const cy = iy0 + Math.random() * (iy1 - iy0);
+      const dx = (cx - 0.5) * vw, dy = (cy - 0.5) * vh;
+      if (Math.hypot(dx, dy) >= exclPx + clusterR * Math.max(vw, vh)) {
+        clusterX = cx; clusterY = cy; centerFound = true; break;
+      }
+    }
+    if (!centerFound) return null;
+
+    // Random start point inside the cluster — chain begins wherever, feels less mechanical
+    const startAngle = Math.random() * Math.PI * 2;
+    const startR     = clusterR * 0.3 + Math.random() * clusterR * 0.7;
+    const pts = [[
+      Math.max(ix0, Math.min(ix1, clusterX + Math.cos(startAngle) * startR)),
+      Math.max(iy0, Math.min(iy1, clusterY + Math.sin(startAngle) * startR)),
+    ]];
+    const MIN_D = 0.022;
+    const starCount = 4 + Math.floor(Math.random() * 4); // 4–7 stars
+
+    for (let attempts = 0; pts.length < starCount && attempts < 500; attempts++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r     = Math.random() * clusterR;
+      const x = clusterX + Math.cos(angle) * r;
+      const y = clusterY + Math.sin(angle) * r;
+      if (x < ix0 || x > ix1 || y < iy0 || y > iy1) continue;
+      const dx = (x - 0.5) * vw, dy = (y - 0.5) * vh;
+      if (Math.hypot(dx, dy) < exclPx) continue;
+      if (pts.every(([px, py]) => Math.hypot(x - px, y - py) >= MIN_D)) {
+        pts.push([x, y]);
+      }
+    }
+
+    if (pts.length < 2) return null;
+
+    const chain = buildNonCrossingChain(pts, clusterR * 2.0);
+    const edges = addTailLoop(pts, chain);
+    return { pts, edges };
+  }
+
+  function generateSessionDefs() {
+    const defs = [];
+    for (const zone of ZONES.slice().sort(() => Math.random() - 0.5)) {
+      if (defs.length >= 5) break;
+      const def = generateConstellationInZone(zone);
+      if (def) defs.push(def);
+    }
+    return defs;
+  }
+  const sessionDefs = generateSessionDefs();
 
   const sessionNames = SILLY_NAMES.slice().sort(() => Math.random() - 0.5);
 
