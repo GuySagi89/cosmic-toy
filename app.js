@@ -1023,7 +1023,7 @@
   // ── Comet ────────────────────────────────────────────────────────
   function spawnComet(x, y, vx, vy) {
     if (comets.length >= 5) blastComet(comets.shift(), x, y);
-    comets.push({ x, y, vx, vy, age: 0, maxAge: 4.5, dead: false });
+    comets.push({ x, y, vx, vy });
   }
   window.spawnComet = spawnComet;
 
@@ -1078,7 +1078,6 @@
 
     for (let i = comets.length - 1; i >= 0; i--) {
       const c = comets[i];
-      c.age += dt;
 
       // Comet already spiralling into a BH — animate until it reaches centre
       if (c.swirl) {
@@ -1133,9 +1132,8 @@
         }
       }
 
-      // Lifetime / off-screen
-      if (c.age > c.maxAge ||
-          c.x < -margin || c.x > canvas.width  + margin ||
+      // Off-screen
+      if (c.x < -margin || c.x > canvas.width  + margin ||
           c.y < -margin || c.y > canvas.height + margin) {
         comets.splice(i, 1); continue;
       }
