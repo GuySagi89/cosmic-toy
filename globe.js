@@ -508,12 +508,20 @@
     canvas.width  = W;
     canvas.height = H;
 
+    function updateCursor() {
+      if (dragVertex || moonDragging) return;
+      const m        = getMoonPos();
+      const overMoon = Math.hypot(mouseX - m.px, mouseY - m.py) < MOON_R * m.s * 2.0;
+      const overGlobe = Math.hypot(mouseX - cx, mouseY - cy) < R;
+      canvas.style.cursor = (overMoon || overGlobe) ? 'grab' : 'default';
+    }
+
     const releaseMoon = () => {
       if (!moonDragging) return;
       moonDragging  = false;
       moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
-      canvas.style.cursor = 'grab';
       if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
+      updateCursor();
     };
 
     const onRelease = () => {
@@ -537,8 +545,8 @@
       rotSpeed += Math.max(-0.05, Math.min(0.05, rawImpulse));
 
       dragVertex = null;
-      canvas.style.cursor = 'grab';
       if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
+      updateCursor();
     };
 
     canvas.addEventListener('pointermove', e => {
@@ -560,12 +568,14 @@
 
       mouseX = x;
       mouseY = y;
+      if (e.buttons === 0) updateCursor();
     });
 
     canvas.addEventListener('pointerenter', () => { mouseInside = true; });
     canvas.addEventListener('pointerleave', () => {
       mouseInside = false;
       if (!dragVertex && !moonDragging) { mouseX = -9999; mouseY = -9999; }
+      canvas.style.cursor = 'default';
       releaseMoon();
     });
 
@@ -671,6 +681,37 @@
       const mdist = Math.hypot(mddx, mddy) || 1;
       moonOrbitSpeed += (mddx / mdist * tdx + mddy / mdist * tdy) / tmag * strength * 1.2;
     });
+
+    window.addEventListener('comet-globe-impact', e => {
+      const { x: impX, y: impY } = e.detail;
+      const rect = canvas.getBoundingClientRect();
+      snapStartTime = Date.now();
+      for (const v of vertices) {
+        const vsx  = rect.left + (v.projX / W) * rect.width;
+        const vsy  = rect.top  + (v.projY / H) * rect.height;
+        const vddx = vsx - impX, vddy = vsy - impY;
+        const vd   = Math.hypot(vddx, vddy) || 1;
+        const mag  = 0.4 * 18 * v._scale;
+        v.driftX   += (vddx / vd) * mag;
+        v.driftY   += (vddy / vd) * mag;
+        v._snapDX0  = v.driftX;
+        v._snapDY0  = v.driftY;
+        v.snapping  = true;
+        v.dragWeight = 0;
+      }
+      rotSpeed += 0.02;
+    });
+
+    window.addEventListener('comet-moon-impact', () => {
+      moonOrbitSpeed += 0.04 * (Math.random() < 0.5 ? 1 : -1);
+    });
+
+    window.getMoonScreenPos = function () {
+      const m   = getMoonPos();
+      const rect = canvas.getBoundingClientRect();
+      const scl  = rect.width / W;
+      return { x: rect.left + m.px * scl, y: rect.top + m.py * scl, r: MOON_R * m.s * scl };
+    };
 
     generateVertices();
     requestAnimationFrame(tick);

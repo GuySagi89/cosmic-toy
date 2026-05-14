@@ -11,6 +11,35 @@
 
   <canvas id="globe-canvas"></canvas>
 
+  <div id="gadget-inventory">
+    <div class="gadget-slot" data-gadget="blackhole" id="gadget-blackhole">
+      <div class="gadget-tooltip">
+        <span class="gadget-tooltip-name">Black Hole</span>
+        <span class="gadget-tooltip-hint">Drag to deploy</span>
+      </div>
+    </div>
+    <div class="gadget-slot" data-gadget="spaceship" id="gadget-spaceship">
+      <svg class="gadget-ship-icon" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7"
+          fill="#6848b8" fill-opacity="0.93"
+          stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/>
+        <ellipse cx="0" cy="-6" rx="2.5" ry="4.5"
+          fill="#98dcff" fill-opacity="0.90"
+          stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/>
+      </svg>
+      <div class="gadget-tooltip">
+        <span class="gadget-tooltip-name">Spaceship</span>
+        <span class="gadget-tooltip-hint">Drag to fly</span>
+      </div>
+    </div>
+    <div class="gadget-slot" data-gadget="comet" id="gadget-comet">
+      <div class="gadget-tooltip">
+        <span class="gadget-tooltip-name">Comet</span>
+        <span class="gadget-tooltip-hint">Throw to launch</span>
+      </div>
+    </div>
+  </div>
+
   <script src="globe.js"></script>
   <script src="app.js"></script>
 </body>
