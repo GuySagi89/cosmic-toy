@@ -722,7 +722,7 @@
             spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
             spawnImpactDebris(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-globe-impact',
-              { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy } }));
+              { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy, source: 'spaceship' } }));
             spaceship.hits++;
             if (spaceship.hits >= 10) triggerShipExplosion();
           }
@@ -752,7 +752,7 @@
             spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
             spawnImpactDebris(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-moon-impact',
-              { detail: { vx: inVx, vy: inVy } }));
+              { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
             spaceship.hits++;
             if (spaceship.hits >= 10) triggerShipExplosion();
           }
@@ -1076,6 +1076,22 @@
     const moon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
     const margin  = 120;
 
+    // Comet-comet collisions — both explode on contact
+    for (let i = comets.length - 1; i >= 1; i--) {
+      if (comets[i].swirl) continue;
+      for (let j = i - 1; j >= 0; j--) {
+        if (comets[j].swirl) continue;
+        if (Math.hypot(comets[i].x - comets[j].x, comets[i].y - comets[j].y) < 18) {
+          blastComet(comets[i], comets[j].x, comets[j].y);
+          blastComet(comets[j], comets[i].x, comets[i].y);
+          comets.splice(i, 1);
+          comets.splice(j, 1);
+          i = j; // after for-loop's i--, outer loop resumes at j-1 (safe)
+          break;
+        }
+      }
+    }
+
     for (let i = comets.length - 1; i >= 0; i--) {
       const c = comets[i];
 
@@ -1144,7 +1160,7 @@
         const gcy = gr.top  + gr.height / 2;
         if (Math.hypot(c.x - gcx, c.y - gcy) < gr.width * 0.22) {
           window.dispatchEvent(new CustomEvent('comet-globe-impact',
-            { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy } }));
+            { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
           spawnImpactDebris(c.x, c.y);
           comets.splice(i, 1); continue;
         }
@@ -1152,7 +1168,8 @@
 
       // Collision: Moon
       if (moon && Math.hypot(c.x - moon.x, c.y - moon.y) < moon.r * 1.4) {
-        window.dispatchEvent(new CustomEvent('comet-moon-impact', { detail: { vx: c.vx, vy: c.vy } }));
+        window.dispatchEvent(new CustomEvent('comet-moon-impact',
+          { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
         spawnImpactDebris(c.x, c.y);
         comets.splice(i, 1); continue;
       }
