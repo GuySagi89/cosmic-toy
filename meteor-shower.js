@@ -27,6 +27,9 @@
       if (!el) continue;
       el.style.setProperty('--cd-pct', pct);
       el.classList.toggle('on-cooldown', active);
+      if (el.classList.contains('gadget-cursor')) {
+        el.style.opacity = active ? '0.52' : '1';
+      }
     }
   }
 

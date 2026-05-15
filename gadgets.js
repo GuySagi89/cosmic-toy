@@ -11,7 +11,8 @@
   let gradEl            = null;
   let trailRafId        = null;
   let dragPath          = [];
-  let isDragging        = false;
+  let isDragging             = false;
+  let spaceshipTouchPending  = false;
   let dragStartX        = 0;
   let dragStartY        = 0;
   let cometDragHistory  = [];
@@ -148,10 +149,6 @@
       dragPath.push({ x: cx, y: cy, t: performance.now() });
     }
     const dx = cx - dragStartX, dy = cy - dragStartY;
-    if (Math.hypot(dx, dy) > 4) {
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-      cursorEl.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
-    }
     if (activeGadget === 'comet' && window.smokeParticles && window.smokeParticles.length < 600) {
       const len = Math.hypot(dx, dy) || 1;
       const bx  = -dx / len, by = -dy / len;
@@ -186,6 +183,7 @@
   function setActiveGadget(type) {
     if (isDragging) {
       isDragging = false;
+      spaceshipTouchPending = false;
       if (activeGadget === 'spaceship') {
         if (cursorEl) cursorEl.classList.remove('pressing');
         window.releaseSpaceship && window.releaseSpaceship();
@@ -263,9 +261,13 @@
       window.spawnBlackHole && window.spawnBlackHole(e.clientX, e.clientY);
       isDragging = false;
     } else if (activeGadget === 'spaceship') {
-      window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
-      if (cursorEl) cursorEl.classList.add('pressing');
-      overlay.setPointerCapture(e.pointerId);
+      if (e.pointerType === 'touch') {
+        spaceshipTouchPending = true;
+      } else {
+        window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+        if (cursorEl) cursorEl.classList.add('pressing');
+        overlay.setPointerCapture(e.pointerId);
+      }
     } else if (activeGadget === 'comet') {
       cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
       showDragOrigin(dragStartX, dragStartY, 'comet');
@@ -291,7 +293,17 @@
     if (!isDragging) return;
 
     if (activeGadget === 'spaceship') {
-      window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+      if (spaceshipTouchPending) {
+        if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 12) {
+          spaceshipTouchPending = false;
+          window.startSpaceship && window.startSpaceship(dragStartX, dragStartY);
+          if (cursorEl) cursorEl.classList.add('pressing');
+          overlay.setPointerCapture(e.pointerId);
+          window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+        }
+      } else {
+        window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+      }
     } else if (activeGadget === 'comet') {
       cometDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
       if (cometDragHistory.length > 10) cometDragHistory.shift();
@@ -319,8 +331,13 @@
     }
 
     if (activeGadget === 'spaceship') {
-      if (cursorEl) cursorEl.classList.remove('pressing');
-      window.releaseSpaceship && window.releaseSpaceship();
+      if (spaceshipTouchPending) {
+        spaceshipTouchPending = false;
+        window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
+      } else {
+        if (cursorEl) cursorEl.classList.remove('pressing');
+        window.releaseSpaceship && window.releaseSpaceship();
+      }
     } else if (activeGadget === 'comet' && window.spawnComet) {
       const now    = performance.now();
       const recent = cometDragHistory.filter(p => now - p.t < 100);
@@ -369,6 +386,7 @@
 
   function onCancel(e) {
     if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
+    spaceshipTouchPending = false;
     if (!isDragging) return;
     isDragging = false;
     hideDragFeedback();
