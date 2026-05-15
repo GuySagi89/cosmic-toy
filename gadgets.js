@@ -27,7 +27,7 @@
     cursorEl.style.top  = y + 'px';
   }
 
-  const TRAIL_MS = 1100;
+  const TRAIL_MS = 200;
 
   function showDragOrigin(x, y, type) {
     // Cancel any previous trail before starting fresh
