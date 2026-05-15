@@ -30,6 +30,11 @@
 
     inventory.querySelectorAll('.gadget-slot').forEach(s => {
       s.classList.toggle('active', s.dataset.gadget === activeGadget);
+      if (s.dataset.gadget === type) {
+        clearTimeout(s._tooltipTimer);
+        s.classList.add('show-tooltip');
+        s._tooltipTimer = setTimeout(() => s.classList.remove('show-tooltip'), 1200);
+      }
     });
 
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
