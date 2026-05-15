@@ -69,11 +69,6 @@
 
     inventory.querySelectorAll('.gadget-slot').forEach(s => {
       s.classList.toggle('active', s.dataset.gadget === activeGadget);
-      if (s.dataset.gadget === type) {
-        clearTimeout(s._tooltipTimer);
-        s.classList.add('show-tooltip');
-        s._tooltipTimer = setTimeout(() => s.classList.remove('show-tooltip'), 1200);
-      }
     });
 
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
@@ -218,6 +213,28 @@
   }
 
   inventory.querySelectorAll('.gadget-slot').forEach(slot => {
+    let longPressTimer = null;
+    let pressX = 0, pressY = 0;
+
+    slot.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'touch') return;
+      pressX = e.clientX; pressY = e.clientY;
+      longPressTimer = setTimeout(() => slot.classList.add('show-tooltip'), 500);
+    });
+
+    const cancelLongPress = () => {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      slot.classList.remove('show-tooltip');
+    };
+
+    slot.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'touch' || !longPressTimer) return;
+      if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 10) cancelLongPress();
+    });
+    slot.addEventListener('pointerup',     cancelLongPress);
+    slot.addEventListener('pointercancel', cancelLongPress);
+
     slot.addEventListener('click', e => {
       e.stopPropagation();
       setActiveGadget(slot.dataset.gadget);

@@ -352,20 +352,16 @@
     if (spaceship.x < MARGIN && spaceship.vx < 0) {
       spaceship.x  = MARGIN;
       spaceship.vx = -spaceship.vx * 0.65;
-      spawnShipImpact(spaceship.x, spaceship.y);
     } else if (spaceship.x > canvas.width - MARGIN && spaceship.vx > 0) {
       spaceship.x  = canvas.width - MARGIN;
       spaceship.vx = -spaceship.vx * 0.65;
-      spawnShipImpact(spaceship.x, spaceship.y);
     }
     if (spaceship.y < MARGIN && spaceship.vy < 0) {
       spaceship.y  = MARGIN;
       spaceship.vy = -spaceship.vy * 0.65;
-      spawnShipImpact(spaceship.x, spaceship.y);
     } else if (spaceship.y > canvas.height - MARGIN && spaceship.vy > 0) {
       spaceship.y  = canvas.height - MARGIN;
       spaceship.vy = -spaceship.vy * 0.65;
-      spawnShipImpact(spaceship.x, spaceship.y);
     }
 
     const allBHs = window.BlackHole ? window.BlackHole.getAll() : [];
