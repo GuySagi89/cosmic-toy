@@ -28,7 +28,9 @@
       el.style.setProperty('--cd-pct', pct);
       el.classList.toggle('on-cooldown', active);
       if (el.classList.contains('gadget-cursor')) {
-        el.style.opacity = active ? '0.52' : '1';
+        // Only dim/restore while cursor is actively shown; don't make it visible on mobile
+        const cur = parseFloat(el.style.opacity);
+        if (cur > 0) el.style.opacity = active ? '0.52' : '1';
       }
     }
   }
