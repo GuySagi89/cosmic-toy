@@ -259,10 +259,11 @@
       showDragOrigin(dragStartX, dragStartY, 'comet');
       overlay.setPointerCapture(e.pointerId);
     } else if (activeGadget === 'meteor-shower') {
-      if (window.MeteorShower && !window.MeteorShower.isReady()) { isDragging = false; return; }
       meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-      showDragOrigin(dragStartX, dragStartY, 'meteor-shower');
       overlay.setPointerCapture(e.pointerId);
+      if (!window.MeteorShower || window.MeteorShower.isReady()) {
+        showDragOrigin(dragStartX, dragStartY, 'meteor-shower');
+      }
     }
   }
 
@@ -279,6 +280,9 @@
     } else if (activeGadget === 'meteor-shower') {
       meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
       if (meteorDragHistory.length > 10) meteorDragHistory.shift();
+      if (!svgEl && window.MeteorShower && window.MeteorShower.isReady()) {
+        showDragOrigin(e.clientX, e.clientY, 'meteor-shower');
+      }
       updateDragFeedback(e.clientX, e.clientY);
     }
   }
