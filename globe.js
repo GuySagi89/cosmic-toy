@@ -18,47 +18,6 @@
   const cx           = W / 2;
   const cy           = H / 2;
 
-  // Moon
-  const MOON_ORBIT_R     = 185;
-  const MOON_R           = 28;   // ~1/4 globe diameter (globe R=110)
-  const MOON_ORBIT_SPEED = 0.008;   // base orbital speed (rad/frame)
-  const MOON_ORBIT_DECAY = 0.018;   // lerp rate back to base after a drag impulse
-  const MOON_SELF_SPEED  = 0.008;   // axial rotation speed (rad/frame)
-  const MOON_ORBIT_TILT  = 0.50;    // radians — tilts the orbit plane for 3-D feel
-
-  // Precomputed dot positions on the unit sphere (lat/lon grid, before self-rotation)
-  const MOON_DOTS = (() => {
-    const dots = [], LAT = 12, LON = 24;
-    for (let i = 0; i <= LAT; i++) {
-      const phi  = i * Math.PI / LAT;
-      const sinP = Math.sin(phi), cosP = Math.cos(phi);
-      const lons = (i === 0 || i === LAT) ? 1 : LON;
-      for (let j = 0; j < lons; j++) {
-        const t0 = j * 2 * Math.PI / lons;
-        dots.push({ sinP, cosP, sinT: Math.sin(t0), cosT: Math.cos(t0) });
-      }
-    }
-    return dots;
-  })();
-
-  // Crater clusters — stored in moon-local frame, rotate with moonSelfAngle
-  const MOON_CRATERS = (() => {
-    const raw = [
-      [  0.50,  0.30, -0.82, 0.25, 0.65 ],
-      [ -0.70,  0.10, -0.71, 0.20, 0.55 ],
-      [  0.20, -0.75, -0.63, 0.28, 0.70 ],
-      [ -0.28,  0.70, -0.65, 0.18, 0.60 ],
-      [  0.85,  0.00, -0.53, 0.22, 0.50 ],
-      [ -0.15, -0.40, -0.90, 0.14, 0.75 ],
-      [  0.60,  0.50,  0.62, 0.20, 0.60 ],
-      [ -0.55, -0.65,  0.52, 0.16, 0.55 ],
-    ];
-    return raw.map(([x, y, z, r, depth]) => {
-      const len = Math.sqrt(x*x + y*y + z*z);
-      return { nx: x/len, ny: y/len, nz: z/len, cosR: Math.cos(r), depth };
-    });
-  })();
-
   // Damped spring constants for snap-back.
   // ζ=0.55 (slightly underdamped → clean overshoot), ωn=22 rad/s (fast).
   // ωd = ωn√(1−ζ²),  k = ζ/√(1−ζ²)
@@ -82,16 +41,6 @@
   let ripple           = null;
   let snapStartTime    = 0;
   let frostPatches     = [];
-  let moonFrostPatches = [];
-
-  let moonOrbitAngle = 0;
-  let moonSelfAngle  = 0;
-  let moonOrbitSpeed = MOON_ORBIT_SPEED;
-  let moonSelfSpeed  = MOON_SELF_SPEED;
-  let moonDragging   = false;
-  let moonDragVel    = 0;
-  let moonFreezeEnd   = 0;
-  let moonGlobalFrost = 0;
 
   const vertices       = [];
   const sortedVertices = [];
@@ -257,194 +206,6 @@
     ctx.fill();
   }
 
-  // Returns the moon's projected screen position and depth for this frame.
-  function getMoonPos() {
-    const sinO = Math.sin(moonOrbitAngle);
-    const cosO = Math.cos(moonOrbitAngle);
-    const mx =  MOON_ORBIT_R * cosO;
-    const my = -MOON_ORBIT_R * sinO * Math.sin(MOON_ORBIT_TILT);
-    const mz =  MOON_ORBIT_R * sinO * Math.cos(MOON_ORBIT_TILT);
-    const s  = FOV_DIST / (FOV_DIST + mz + R);
-    return { mx, my, mz, px: cx + mx * s, py: cy + my * s, s };
-  }
-
-  // Gauss-Newton: find the orbit angle whose projected screen pos is closest to (msx,msy).
-  // Converges in ~6 iterations for any mouse position, stable at all orbit positions.
-  function nearestOrbitAngle(msx, msy, startAngle) {
-    const sinT = Math.sin(MOON_ORBIT_TILT);
-    const cosT = Math.cos(MOON_ORBIT_TILT);
-    let θ = startAngle;
-    for (let iter = 0; iter < 8; iter++) {
-      const sinθ = Math.sin(θ), cosθ = Math.cos(θ);
-      const omx  =  MOON_ORBIT_R * cosθ;
-      const omy  = -MOON_ORBIT_R * sinθ * sinT;
-      const omz  =  MOON_ORBIT_R * sinθ * cosT;
-      const denom = FOV_DIST + omz + R;
-      const s    = FOV_DIST / denom;
-      const px   = cx + omx * s;
-      const py   = cy + omy * s;
-      const domx = -MOON_ORBIT_R * sinθ;
-      const domy = -MOON_ORBIT_R * cosθ * sinT;
-      const domz =  MOON_ORBIT_R * cosθ * cosT;
-      const ds   = -FOV_DIST * domz / (denom * denom);
-      const dpx  = domx * s + omx * ds;
-      const dpy  = domy * s + omy * ds;
-      const num  = (px - msx) * dpx + (py - msy) * dpy;
-      const den  = dpx * dpx + dpy * dpy;
-      if (den < 1e-6) break;
-      θ -= Math.max(-0.3, Math.min(0.3, num / den));
-    }
-    return θ;
-  }
-
-  function drawOrbitRing() {
-    const alpha = 0.18;
-    ctx.beginPath();
-    for (let i = 0; i <= 80; i++) {
-      const θ  = (i / 80) * Math.PI * 2;
-      const ox =  MOON_ORBIT_R * Math.cos(θ);
-      const oy = -MOON_ORBIT_R * Math.sin(θ) * Math.sin(MOON_ORBIT_TILT);
-      const oz =  MOON_ORBIT_R * Math.sin(θ) * Math.cos(MOON_ORBIT_TILT);
-      const s  = FOV_DIST / (FOV_DIST + oz + R);
-      const sx = cx + ox * s;
-      const sy = cy + oy * s;
-      if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
-    }
-    ctx.closePath();
-    ctx.strokeStyle = `rgba(140, 110, 210, ${alpha})`;
-    ctx.lineWidth   = 0.6;
-    ctx.stroke();
-  }
-
-  function drawMoon({ px, py, mx, my, mz, s }) {
-    // Clean up expired moon frost patches
-    for (let i = moonFrostPatches.length - 1; i >= 0; i--) {
-      if (frostAlpha(moonFrostPatches[i].startTime) < 0) moonFrostPatches.splice(i, 1);
-    }
-
-    const mr = MOON_R * s;
-
-    const depthAlpha = (mz > 0 && !moonDragging) ? Math.max(0.3, 1 - mz / (MOON_ORBIT_R * 1.2)) : 1;
-    ctx.save();
-    ctx.globalAlpha = depthAlpha;
-
-    // Faint outer lavender glow
-    const glow = ctx.createRadialGradient(px, py, mr * 0.9, px, py, mr * 3.2);
-    glow.addColorStop(0, 'rgba(175, 148, 220, 0.20)');
-    glow.addColorStop(1, 'rgba(90,  70, 170, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(px, py, mr * 3.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Dot-particle surface
-    const cosSA = Math.cos(moonSelfAngle);
-    const sinSA = Math.sin(moonSelfAngle);
-
-    // Light: top-right, slightly toward camera (+x=right, -y=screen-up, -z=toward viewer)
-    const lx = 0.60, ly = -0.55, lz = -0.58; // pre-normalised length ≈ 1.0
-
-    // Rotate crater centres into the current self-rotation frame
-    const rotCraters = MOON_CRATERS.map(c => ({
-      nx: c.nx * cosSA - c.nz * sinSA,
-      ny: c.ny,
-      nz: c.nx * sinSA + c.nz * cosSA,
-      cosR: c.cosR, depth: c.depth,
-    }));
-
-    for (const d of MOON_DOTS) {
-      // Surface normal after Y-axis self-rotation
-      const nx = d.sinP * (d.cosT * cosSA - d.sinT * sinSA);
-      const ny = d.cosP;
-      const nz = d.sinP * (d.sinT * cosSA + d.cosT * sinSA);
-
-      if (nz >= 0) continue; // back hemisphere — cull
-
-      const facing = -nz; // 0 at rim → 1 at disk centre
-
-      // Perspective-project the dot's world position
-      const wz = mz + MOON_R * nz;
-      const ds = FOV_DIST / (FOV_DIST + wz + R);
-      const sx = cx + (mx + MOON_R * nx) * ds;
-      const sy = cy + (my + MOON_R * ny) * ds;
-
-      // Directional lighting
-      const lit = Math.max(0, nx * lx + ny * ly + nz * lz);
-
-      // Crater influence — soft organic falloff
-      let crater = 0;
-      for (const c of rotCraters) {
-        const dp = nx * c.nx + ny * c.ny + nz * c.nz;
-        if (dp > c.cosR) {
-          const t = ((dp - c.cosR) / (1 - c.cosR)) ** 0.65;
-          crater = Math.max(crater, t * c.depth);
-        }
-      }
-
-      // Palette: #3A2A5C (shadow) → #C9B8E8 (base) → #F0EBFF (highlight)
-      let r, g, b;
-      if (lit < 0.5) {
-        const t = lit * 2;
-        r = Math.round(58  + t * (201 - 58));
-        g = Math.round(42  + t * (184 - 42));
-        b = Math.round(92  + t * (232 - 92));
-      } else {
-        const t = (lit - 0.5) * 2;
-        r = Math.round(201 + t * (240 - 201));
-        g = Math.round(184 + t * (235 - 184));
-        b = Math.round(232 + t * (255 - 232));
-      }
-
-      // Craters: shift toward darker purple #4A3268
-      if (crater > 0) {
-        r = Math.round(r + crater * (74  - r));
-        g = Math.round(g + crater * (50  - g));
-        b = Math.round(b + crater * (104 - b));
-      }
-
-      // Global freeze frost — whole moon turns icy white
-      if (moonGlobalFrost > 0) {
-        r = Math.round(r + moonGlobalFrost * (240 - r));
-        g = Math.round(g + moonGlobalFrost * (250 - g));
-        b = Math.round(b + moonGlobalFrost * (255 - b));
-      }
-
-      // Frost: blend dots toward icy blue-white based on angular distance in local frame
-      if (moonFrostPatches.length) {
-        const lnx = d.sinP * d.cosT; // dot normal in moon-local frame (pre-self-rotation)
-        const lny = d.cosP;
-        const lnz = d.sinP * d.sinT;
-        const MOON_FROST_R = 0.55;
-        let frostW = 0;
-        for (const fp of moonFrostPatches) {
-          const fa = frostAlpha(fp.startTime);
-          if (fa <= 0) continue;
-          const dotP  = lnx*fp.lnx + lny*fp.lny + lnz*fp.lnz;
-          const angle = Math.acos(Math.max(-1, Math.min(1, dotP)));
-          if (angle < MOON_FROST_R) {
-            const w = (1 - angle / MOON_FROST_R) ** 1.5 * fa;
-            if (w > frostW) frostW = w;
-          }
-        }
-        if (frostW > 0) {
-          r = Math.round(r + frostW * (240 - r));
-          g = Math.round(g + frostW * (250 - g));
-          b = Math.round(b + frostW * (255 - b));
-        }
-      }
-
-      const alpha = Math.min(1, facing * (0.55 + lit * 0.45));
-      const dotR  = Math.max(0.35, 1.6 * facing * s);
-
-      ctx.beginPath();
-      ctx.arc(sx, sy, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
   function drawLines(sorted) {
     ctx.lineWidth = 0.5;
     for (let i = 0; i < sorted.length; i++) {
@@ -553,25 +314,8 @@
 
 
   function tick() {
-    const frozen = moonFreezeEnd > 0 && Date.now() < moonFreezeEnd;
-    moonSelfSpeed += ((frozen ? 0 : MOON_SELF_SPEED) - moonSelfSpeed) * 0.035;
-    moonSelfAngle += moonSelfSpeed;
-    if (!moonDragging) {
-      const now = Date.now();
-      if (moonFreezeEnd > 0 && now < moonFreezeEnd) {
-        moonGlobalFrost = 1.0;
-        moonOrbitSpeed  = 0;
-      } else {
-        if (moonFreezeEnd > 0) {
-          const fadeT = Math.min(1, (now - moonFreezeEnd) / 2500);
-          moonGlobalFrost = 1 - fadeT;
-          if (moonGlobalFrost <= 0) { moonGlobalFrost = 0; moonFreezeEnd = 0; }
-        }
-        moonOrbitSpeed += (MOON_ORBIT_SPEED - moonOrbitSpeed) * MOON_ORBIT_DECAY;
-        moonOrbitAngle += moonOrbitSpeed;
-      }
-    }
-    const moon = getMoonPos();
+    window.Moon.update();
+    const moon = window.Moon.getPos();
 
     rotSpeed += (ROT_SPEED - rotSpeed) * SPIN_DECAY;
     rotY += rotSpeed;
@@ -583,11 +327,11 @@
 
     ctx.clearRect(0, 0, W, H);
     drawGlow();
-    drawOrbitRing();
+    window.Moon.drawOrbitRing();
 
-    if (!moonDragging && moon.mz > 0) {
+    if (!window.Moon.isDragging() && moon.mz > 0) {
       // Moon is behind the globe — draw first so globe renders on top
-      drawMoon(moon);
+      window.Moon.draw();
       drawGlobeFrost(true);   // back faces — beneath the mesh
       drawLines(sorted);
       drawDots(sorted);
@@ -598,7 +342,7 @@
       drawLines(sorted);
       drawDots(sorted);
       drawGlobeFrost(false);  // front faces — on top of the mesh
-      drawMoon(moon);
+      window.Moon.draw();
     }
 
     requestAnimationFrame(tick);
@@ -632,20 +376,11 @@
     canvas.height = H;
 
     function updateCursor() {
-      if (dragVertex || moonDragging) return;
-      const m        = getMoonPos();
-      const overMoon = Math.hypot(mouseX - m.px, mouseY - m.py) < MOON_R * m.s * 2.0;
+      if (dragVertex || window.Moon.isDragging()) return;
+      const overMoon  = window.Moon.isOver(mouseX, mouseY);
       const overGlobe = Math.hypot(mouseX - cx, mouseY - cy) < R;
       canvas.style.cursor = (overMoon || overGlobe) ? 'grab' : 'default';
     }
-
-    const releaseMoon = () => {
-      if (!moonDragging) return;
-      moonDragging  = false;
-      moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
-      if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
-      updateCursor();
-    };
 
     const onRelease = () => {
       if (!dragVertex) return;
@@ -673,8 +408,8 @@
     };
 
     canvas.addEventListener('pointermove', e => {
-      if (e.buttons === 0 && dragVertex)  onRelease();
-      if (e.buttons === 0 && moonDragging) releaseMoon();
+      if (e.buttons === 0 && dragVertex)             onRelease();
+      if (e.buttons === 0 && window.Moon.isDragging()) window.Moon.release();
       const raw = canvasCoords(e, canvas);
       // Clamp to canvas bounds: with setPointerCapture the finger can slide off
       // the canvas edge, producing out-of-range coords that stretch grid lines
@@ -682,12 +417,7 @@
       const x = Math.max(0, Math.min(W, raw.x));
       const y = Math.max(0, Math.min(H, raw.y));
 
-      if (moonDragging) {
-        const prev     = moonOrbitAngle;
-        moonOrbitAngle = nearestOrbitAngle(x, y, moonOrbitAngle);
-        const dAngle   = moonOrbitAngle - prev;
-        moonDragVel    = moonDragVel * 0.7 + Math.max(-0.05, Math.min(0.05, dAngle)) * 0.3;
-      }
+      if (window.Moon.isDragging()) window.Moon.drag(x, y);
 
       mouseX = x;
       mouseY = y;
@@ -697,9 +427,9 @@
     canvas.addEventListener('pointerenter', () => { mouseInside = true; });
     canvas.addEventListener('pointerleave', () => {
       mouseInside = false;
-      if (!dragVertex && !moonDragging) { mouseX = -9999; mouseY = -9999; }
+      if (!dragVertex && !window.Moon.isDragging()) { mouseX = -9999; mouseY = -9999; }
       canvas.style.cursor = 'default';
-      releaseMoon();
+      window.Moon.release();
     });
 
     canvas.addEventListener('pointerdown', e => {
@@ -714,11 +444,7 @@
       mouseInside = true;
 
       // Moon grab takes priority — check it first
-      const m     = getMoonPos();
-      const grabR = MOON_R * m.s * 2.0;
-      if (Math.hypot(x - m.px, y - m.py) < grabR) {
-        moonDragging = true;
-        moonDragVel  = 0;
+      if (window.Moon.tryGrab(x, y)) {
         canvas.style.cursor = 'grabbing';
         canvas.setPointerCapture(e.pointerId);
         return;
@@ -742,23 +468,19 @@
       canvas.setPointerCapture(e.pointerId);
     });
 
-    window.addEventListener('pointerup', () => { onRelease(); releaseMoon(); });
+    window.addEventListener('pointerup', () => { onRelease(); window.Moon.release(); });
 
     window.addEventListener('blackhole-explode', e => {
       const { x: bhX, y: bhY } = e.detail;
       const rect = canvas.getBoundingClientRect();
       const gcx  = rect.left + rect.width  / 2;
       const gcy  = rect.top  + rect.height / 2;
-      // (nx, ny): unit vector FROM globe center TOWARD BH in screen space
       const ddx  = bhX - gcx;
       const ddy  = bhY - gcy;
       const dist = Math.hypot(ddx, ddy) || 1;
-      const nx   = ddx / dist;
-      const ny   = ddy / dist;
       const strength = Math.max(0.35, 1 - dist / 1200);
 
-      // Globe: each vertex pushed AWAY from BH based on its own projected screen position
-      // Spin driven by globe-center direction (Y-axis rotation, horizontal component only)
+      // Globe spin
       rotSpeed += (bhX - gcx) / dist * strength * 0.05;
 
       snapStartTime = Date.now();
@@ -776,33 +498,6 @@
         v.snapping   = true;
         v.dragWeight = 0;
       }
-
-      // Moon: pushed AWAY from BH based on the moon's own screen position.
-      // Project onto the moon's orbital screen-space tangent for full XY response.
-      const sinO    = Math.sin(moonOrbitAngle);
-      const cosO    = Math.cos(moonOrbitAngle);
-      const sinTilt = Math.sin(MOON_ORBIT_TILT);
-      const cosTilt = Math.cos(MOON_ORBIT_TILT);
-      const omx  =  MOON_ORBIT_R * cosO;
-      const omy  = -MOON_ORBIT_R * sinO * sinTilt;
-      const omz  =  MOON_ORBIT_R * sinO * cosTilt;
-      const denom = FOV_DIST + omz + R;
-      const s0   = FOV_DIST / denom;
-      const domx = -MOON_ORBIT_R * sinO;
-      const domy = -MOON_ORBIT_R * cosO * sinTilt;
-      const domz =  MOON_ORBIT_R * cosO * cosTilt;
-      const ds   = -FOV_DIST * domz / (denom * denom);
-      const tdx  = domx * s0 + omx * ds;
-      const tdy  = domy * s0 + omy * ds;
-      const tmag = Math.hypot(tdx, tdy) || 1;
-      // Moon's actual screen position (canvas → viewport CSS px)
-      const moonSx = rect.left + ((cx + omx * s0) / W) * rect.width;
-      const moonSy = rect.top  + ((cy + omy * s0) / H) * rect.height;
-      // Direction from BH toward moon = push moon away from BH
-      const mddx = moonSx - bhX;
-      const mddy = moonSy - bhY;
-      const mdist = Math.hypot(mddx, mddy) || 1;
-      moonOrbitSpeed += (mddx / mdist * tdx + mddy / mdist * tdy) / tmag * strength * 1.2;
     });
 
     window.addEventListener('comet-globe-impact', e => {
@@ -844,47 +539,6 @@
       rotSpeed += (-vx / speed) * 0.03 * sf;
     });
 
-    window.addEventListener('comet-moon-impact', e => {
-      const { vx, vy, source } = e.detail;
-      const speed = Math.hypot(vx, vy) || 1;
-      const sf    = Math.min(speed / 400, 2.0);
-
-      if (source === 'comet') {
-        moonFreezeEnd   = Date.now() + 3000;
-        moonOrbitSpeed  = 0;
-        moonGlobalFrost = 1.0;
-      } else {
-        const tangX   = -Math.sin(moonOrbitAngle);
-        const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
-        const tangLen = Math.hypot(tangX, tangY) || 1;
-        const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
-        moonOrbitSpeed += proj * 0.08 * sf;
-      }
-
-      if (e.detail.source === 'comet' && e.detail.x != null) {
-        const moon = getMoonPos();
-        const rect = canvas.getBoundingClientRect();
-        const icx  = (e.detail.x - rect.left) * (W / rect.width);
-        const icy  = (e.detail.y - rect.top)  * (H / rect.height);
-        const mr   = MOON_R * moon.s;
-        let nnx = (icx - moon.px) / mr;
-        let nny = (icy - moon.py) / mr;
-        const sq = 1 - nnx * nnx - nny * nny;
-        let nnz = sq > 0 ? -Math.sqrt(sq) : 0;
-        const nl = Math.hypot(nnx, nny, nnz) || 1;
-        nnx /= nl; nny /= nl; nnz /= nl;
-        // Undo current self-rotation to store in moon-local frame
-        const cosSA = Math.cos(moonSelfAngle);
-        const sinSA = Math.sin(moonSelfAngle);
-        moonFrostPatches.push({
-          lnx:  nnx * cosSA + nnz * sinSA,
-          lny:  nny,
-          lnz: -nnx * sinSA + nnz * cosSA,
-          startTime: Date.now(),
-        });
-      }
-    });
-
     window.triggerGlobeRipple = function(impX, impY) {
       const rect = canvas.getBoundingClientRect();
       const icx  = (impX - rect.left) * (W / rect.width);
@@ -899,13 +553,6 @@
       if (nearest) {
         ripple = { startTime: Date.now(), ox: nearest.x0, oy: nearest.y0, oz: nearest.z0, amp: 18 };
       }
-    };
-
-    window.getMoonScreenPos = function () {
-      const m   = getMoonPos();
-      const rect = canvas.getBoundingClientRect();
-      const scl  = rect.width / W;
-      return { x: rect.left + m.px * scl, y: rect.top + m.py * scl, r: MOON_R * m.s * scl };
     };
 
     generateVertices();
