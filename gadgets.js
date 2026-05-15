@@ -7,7 +7,10 @@
   let overlay           = null;
   let cursorEl          = null;
   let originEl          = null;
-  let lineEl            = null;
+  let svgEl             = null;
+  let pathEl            = null;
+  let gradEl            = null;
+  let dragPath          = [];
   let isDragging        = false;
   let dragStartX        = 0;
   let dragStartY        = 0;
@@ -29,29 +32,75 @@
     originEl.style.top  = y + 'px';
     document.body.appendChild(originEl);
 
-    lineEl = document.createElement('div');
-    lineEl.className = `gadget-drag-line gadget-drag-line--${type}`;
-    lineEl.style.left   = x + 'px';
-    lineEl.style.top    = y + 'px';
-    lineEl.style.width  = '0px';
-    document.body.appendChild(lineEl);
+    dragPath = [{ x, y }];
+
+    const NS    = 'http://www.w3.org/2000/svg';
+    const color = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
+    const gradId = `drag-trail-${type}`;
+
+    svgEl = document.createElementNS(NS, 'svg');
+    svgEl.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9997;overflow:visible;';
+
+    const defs = document.createElementNS(NS, 'defs');
+    gradEl = document.createElementNS(NS, 'linearGradient');
+    gradEl.setAttribute('id', gradId);
+    gradEl.setAttribute('gradientUnits', 'userSpaceOnUse');
+    gradEl.setAttribute('x1', x); gradEl.setAttribute('y1', y);
+    gradEl.setAttribute('x2', x); gradEl.setAttribute('y2', y);
+
+    const stop0 = document.createElementNS(NS, 'stop');
+    stop0.setAttribute('offset', '0%');
+    stop0.setAttribute('stop-color', color);
+    stop0.setAttribute('stop-opacity', '0');
+    const stop1 = document.createElementNS(NS, 'stop');
+    stop1.setAttribute('offset', '100%');
+    stop1.setAttribute('stop-color', color);
+    stop1.setAttribute('stop-opacity', '0.7');
+
+    gradEl.appendChild(stop0);
+    gradEl.appendChild(stop1);
+    defs.appendChild(gradEl);
+    svgEl.appendChild(defs);
+
+    pathEl = document.createElementNS(NS, 'path');
+    pathEl.setAttribute('stroke', `url(#${gradId})`);
+    pathEl.setAttribute('stroke-width', '1.8');
+    pathEl.setAttribute('stroke-linecap', 'round');
+    pathEl.setAttribute('stroke-linejoin', 'round');
+    pathEl.setAttribute('fill', 'none');
+    svgEl.appendChild(pathEl);
+
+    document.body.appendChild(svgEl);
   }
 
   function updateDragFeedback(cx, cy) {
-    if (!cursorEl || !lineEl) return;
-    const dx   = cx - dragStartX, dy = cy - dragStartY;
-    const dist  = Math.hypot(dx, dy);
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (!cursorEl || !pathEl) return;
+
+    const last = dragPath[dragPath.length - 1];
+    if (Math.hypot(cx - last.x, cy - last.y) > 2) {
+      dragPath.push({ x: cx, y: cy });
+      if (dragPath.length > 200) dragPath.shift();
+    }
+
+    let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
+    for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
+    pathEl.setAttribute('d', d);
+
+    gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
+    gradEl.setAttribute('x2', cx);            gradEl.setAttribute('y2', cy);
+
+    const dx = cx - dragStartX, dy = cy - dragStartY;
+    const dist = Math.hypot(dx, dy);
     if (dist > 4) {
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
       cursorEl.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
     }
-    lineEl.style.width     = dist + 'px';
-    lineEl.style.transform = `translateY(-50%) rotate(${angle}deg)`;
   }
 
   function hideDragFeedback() {
     if (originEl) { originEl.remove(); originEl = null; }
-    if (lineEl)   { lineEl.remove();   lineEl   = null; }
+    if (svgEl)    { svgEl.remove();    svgEl = null; pathEl = null; gradEl = null; }
+    dragPath = [];
     if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
   }
 

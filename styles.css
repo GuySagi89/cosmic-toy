@@ -530,22 +530,4 @@ body {
   box-shadow: 0 0 6px 3px rgba(255, 148, 50, 0.85);
 }
 
-/* ── Drag connector line ── */
-.gadget-drag-line {
-  position: fixed;
-  height: 1.5px;
-  pointer-events: none;
-  z-index: 9997;
-  transform-origin: left center;
-  opacity: 0.45;
-  border-radius: 1px;
-}
-
-.gadget-drag-line--comet {
-  background: linear-gradient(to right, rgba(160, 235, 255, 0.9), rgba(80, 180, 255, 0.2));
-}
-
-.gadget-drag-line--meteor-shower {
-  background: linear-gradient(to right, rgba(255, 200, 80, 0.9), rgba(220, 80, 20, 0.2));
-}
 
