@@ -13,6 +13,8 @@
   let dragPath          = [];
   let isDragging             = false;
   let spaceshipTouchPending  = false;
+  let activePointerId        = null;
+  let lastPointerType        = 'mouse';
   let dragStartX        = 0;
   let dragStartY        = 0;
   let cometDragHistory  = [];
@@ -226,14 +228,21 @@
     }
   }
 
+  // Track last real pointer type to avoid treating compat mouse events as genuine mouse input
+  document.addEventListener('pointerdown', e => { lastPointerType = e.pointerType; }, { capture: true });
+
   // Track cursor even when pointer is over inventory (above the overlay)
   document.addEventListener('pointermove', e => {
     if (!cursorEl) return;
-    moveCursor(e.clientX, e.clientY);
+    // Only move cursor for the active tracked pointer or any mouse
+    if (e.pointerType === 'mouse' || e.pointerId === activePointerId || activePointerId === null) {
+      moveCursor(e.clientX, e.clientY);
+    }
 
-    // Left button released while we missed the pointerup (e.g. capture dropped by contextmenu)
-    if (isDragging && !(e.buttons & 1)) {
+    // Mouse-only: recover from stuck drag when left button silently released (e.g. after contextmenu)
+    if (e.pointerType === 'mouse' && isDragging && !(e.buttons & 1)) {
       isDragging = false;
+      activePointerId = null;
       hideDragFeedback();
       if (activeGadget === 'spaceship') {
         if (cursorEl) cursorEl.classList.remove('pressing');
@@ -241,7 +250,8 @@
       }
     }
 
-    if (e.pointerType !== 'mouse') return; // touch cursor visibility is managed by down/up
+    if (e.pointerType !== 'mouse') return;
+    if (lastPointerType !== 'mouse') return; // ignore compat mouse events that follow a touch
     const over = document.elementFromPoint(e.clientX, e.clientY);
     cursorEl.style.opacity = (over && inventory.contains(over)) ? '0'
       : cursorEl.classList.contains('on-cooldown') ? '0.52' : '1';
@@ -249,6 +259,8 @@
 
   function onDown(e) {
     if (e.button !== 0) return;
+    if (activePointerId !== null) return; // reject a second simultaneous touch
+    activePointerId = e.pointerId;
     if (e.pointerType !== 'mouse' && cursorEl) {
       moveCursor(e.clientX, e.clientY);
       cursorEl.style.opacity = '1';
@@ -282,6 +294,7 @@
   }
 
   function onMove(e) {
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
     moveCursor(e.clientX, e.clientY);
     if (activeGadget === 'spaceship' && e.pointerType === 'mouse') {
       const ship = window.Spaceship && window.Spaceship.get();
@@ -320,6 +333,8 @@
 
   function onUp(e) {
     if (e.button !== 0) return;
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    activePointerId = null;
     if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     if (!isDragging) return;
     isDragging = false;
@@ -385,6 +400,8 @@
   }
 
   function onCancel(e) {
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    activePointerId = null;
     if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     spaceshipTouchPending = false;
     if (!isDragging) return;
