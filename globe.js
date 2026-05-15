@@ -79,8 +79,10 @@
   let mouseY        = -9999;
   let mouseInside   = false;
   let dragVertex    = null;
-  let ripple        = null;
-  let snapStartTime = 0;
+  let ripple           = null;
+  let snapStartTime    = 0;
+  let frostPatches     = [];
+  let moonFrostPatches = [];
 
   let moonOrbitAngle = 0;
   let moonSelfAngle  = 0;
@@ -312,6 +314,11 @@
   }
 
   function drawMoon({ px, py, mx, my, mz, s }) {
+    // Clean up expired moon frost patches
+    for (let i = moonFrostPatches.length - 1; i >= 0; i--) {
+      if (frostAlpha(moonFrostPatches[i].startTime) < 0) moonFrostPatches.splice(i, 1);
+    }
+
     const mr = MOON_R * s;
 
     const depthAlpha = (mz > 0 && !moonDragging) ? Math.max(0.3, 1 - mz / (MOON_ORBIT_R * 1.2)) : 1;
@@ -392,6 +399,30 @@
         b = Math.round(b + crater * (104 - b));
       }
 
+      // Frost: blend dots toward icy blue-white based on angular distance in local frame
+      if (moonFrostPatches.length) {
+        const lnx = d.sinP * d.cosT; // dot normal in moon-local frame (pre-self-rotation)
+        const lny = d.cosP;
+        const lnz = d.sinP * d.sinT;
+        const MOON_FROST_R = 0.55;
+        let frostW = 0;
+        for (const fp of moonFrostPatches) {
+          const fa = frostAlpha(fp.startTime);
+          if (fa <= 0) continue;
+          const dotP  = lnx*fp.lnx + lny*fp.lny + lnz*fp.lnz;
+          const angle = Math.acos(Math.max(-1, Math.min(1, dotP)));
+          if (angle < MOON_FROST_R) {
+            const w = (1 - angle / MOON_FROST_R) ** 1.5 * fa;
+            if (w > frostW) frostW = w;
+          }
+        }
+        if (frostW > 0) {
+          r = Math.round(r + frostW * (240 - r));
+          g = Math.round(g + frostW * (250 - g));
+          b = Math.round(b + frostW * (255 - b));
+        }
+      }
+
       const alpha = Math.min(1, facing * (0.55 + lit * 0.45));
       const dotR  = Math.max(0.35, 1.6 * facing * s);
 
@@ -412,7 +443,7 @@
       const ry = v.projY + v.driftY;
       if (v.lat < LAT_STEPS) {
         const nb  = grid[v.lat + 1][v.lon];
-        const a   = Math.min(v._scale, nb._scale) * 0.35;
+        const a   = Math.min(v._scale, nb._scale) * 0.52;
         const col = baseColor((v._rz + nb._rz) / 2);
         ctx.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(3)})`;
         ctx.beginPath();
@@ -421,7 +452,7 @@
         ctx.stroke();
       }
       const nb2  = grid[v.lat][(v.lon + 1) % LON_STEPS];
-      const a2   = Math.min(v._scale, nb2._scale) * 0.35;
+      const a2   = Math.min(v._scale, nb2._scale) * 0.52;
       const col2 = baseColor((v._rz + nb2._rz) / 2);
       ctx.strokeStyle = `rgba(${col2[0]},${col2[1]},${col2[2]},${a2.toFixed(3)})`;
       ctx.beginPath();
@@ -434,7 +465,7 @@
   function drawDots(sorted) {
     for (let i = 0; i < sorted.length; i++) {
       const v  = sorted[i];
-      const a  = Math.min(1, v._scale * 1.6);
+      const a  = Math.min(1, v._scale * 2.1);
       const r  = Math.max(0.5, 2.0 * v._scale);
       const px = v.projX + v.driftX;
       const py = v.projY + v.driftY;
@@ -445,6 +476,71 @@
       ctx.fill();
     }
   }
+
+  // Returns 0–1 opacity for a frost patch (persist 3 s, then fade 12 s), or -1 when expired.
+  function frostAlpha(startTime) {
+    const age = (Date.now() - startTime) / 1000;
+    if (age >= 15.0) return -1;
+    if (age <  3.0)  return 1.0;
+    return 1.0 - (age - 3.0) / 12.0;
+  }
+
+  // backOnly=true  → draw only back-hemisphere faces (call BEFORE mesh)
+  // backOnly=false → draw only front-hemisphere faces (call AFTER mesh)
+  function drawGlobeFrost(backOnly) {
+    for (let i = frostPatches.length - 1; i >= 0; i--) {
+      if (frostAlpha(frostPatches[i].startTime) < 0) frostPatches.splice(i, 1);
+    }
+    if (!frostPatches.length) return;
+
+    const cosR = Math.cos(rotY);
+    const sinR = Math.sin(rotY);
+    const FROST_R = 0.55;
+
+    for (let lat = 0; lat < LAT_STEPS; lat++) {
+      for (let lon = 0; lon < LON_STEPS; lon++) {
+        const v00 = grid[lat][lon];
+        const v10 = grid[lat + 1][lon];
+        const v11 = grid[lat + 1][(lon + 1) % LON_STEPS];
+        const v01 = grid[lat][(lon + 1) % LON_STEPS];
+
+        const fcx = (v00.x0 + v10.x0 + v11.x0 + v01.x0) * 0.25;
+        const fcy = (v00.y0 + v10.y0 + v11.y0 + v01.y0) * 0.25;
+        const fcz = (v00.z0 + v10.z0 + v11.z0 + v01.z0) * 0.25;
+
+        const rfcz = -fcx * sinR + fcz * cosR;
+        const isBack = rfcz > 0;
+        if (isBack !== backOnly) continue; // skip wrong pass
+
+        // Back faces fade toward the pole; front faces are fully opaque at their depth
+        const depthFade = isBack ? Math.max(0, 1 - rfcz / R) : 1.0;
+
+        const fcLen = Math.sqrt(fcx*fcx + fcy*fcy + fcz*fcz) || 1;
+        let maxW = 0;
+        for (const p of frostPatches) {
+          const fa = frostAlpha(p.startTime);
+          if (fa <= 0) continue;
+          const dot   = (p.ox*fcx + p.oy*fcy + p.oz*fcz) / (R * fcLen);
+          const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+          if (angle < FROST_R) {
+            const w = (1 - angle / FROST_R) ** 1.5 * fa * depthFade;
+            if (w > maxW) maxW = w;
+          }
+        }
+        if (maxW < 0.01) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(v00.projX + v00.driftX, v00.projY + v00.driftY);
+        ctx.lineTo(v10.projX + v10.driftX, v10.projY + v10.driftY);
+        ctx.lineTo(v11.projX + v11.driftX, v11.projY + v11.driftY);
+        ctx.lineTo(v01.projX + v01.driftX, v01.projY + v01.driftY);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(240, 250, 255, ${(maxW * 0.72).toFixed(3)})`;
+        ctx.fill();
+      }
+    }
+  }
+
 
   function tick() {
     moonSelfAngle += MOON_SELF_SPEED;
@@ -469,12 +565,16 @@
     if (!moonDragging && moon.mz > 0) {
       // Moon is behind the globe — draw first so globe renders on top
       drawMoon(moon);
+      drawGlobeFrost(true);   // back faces — beneath the mesh
       drawLines(sorted);
       drawDots(sorted);
+      drawGlobeFrost(false);  // front faces — on top of the mesh
     } else {
       // Moon in front, or being dragged — always draw on top so it stays visible
+      drawGlobeFrost(true);   // back faces — beneath the mesh
       drawLines(sorted);
       drawDots(sorted);
+      drawGlobeFrost(false);  // front faces — on top of the mesh
       drawMoon(moon);
     }
 
@@ -712,6 +812,9 @@
       }
       if (nearest) {
         ripple = { startTime: Date.now(), ox: nearest.x0, oy: nearest.y0, oz: nearest.z0, amp: sf * 14 };
+        if (e.detail.source === 'comet') {
+          frostPatches.push({ ox: nearest.x0, oy: nearest.y0, oz: nearest.z0, startTime: Date.now() });
+        }
       }
 
       // Spin: direction from horizontal component, magnitude scales with speed
@@ -722,12 +825,34 @@
       const { vx, vy } = e.detail;
       const speed = Math.hypot(vx, vy) || 1;
       const sf    = Math.min(speed / 400, 2.0);
-      // Project comet velocity onto the moon's orbital tangent to get directional push
-      const tangX = -Math.sin(moonOrbitAngle);
-      const tangY = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
+      const tangX   = -Math.sin(moonOrbitAngle);
+      const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
       const tangLen = Math.hypot(tangX, tangY) || 1;
-      const proj = (vx * tangX + vy * tangY) / (speed * tangLen);
+      const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
       moonOrbitSpeed += proj * 0.08 * sf;
+
+      if (e.detail.source === 'comet' && e.detail.x != null) {
+        const moon = getMoonPos();
+        const rect = canvas.getBoundingClientRect();
+        const icx  = (e.detail.x - rect.left) * (W / rect.width);
+        const icy  = (e.detail.y - rect.top)  * (H / rect.height);
+        const mr   = MOON_R * moon.s;
+        let nnx = (icx - moon.px) / mr;
+        let nny = (icy - moon.py) / mr;
+        const sq = 1 - nnx * nnx - nny * nny;
+        let nnz = sq > 0 ? -Math.sqrt(sq) : 0;
+        const nl = Math.hypot(nnx, nny, nnz) || 1;
+        nnx /= nl; nny /= nl; nnz /= nl;
+        // Undo current self-rotation to store in moon-local frame
+        const cosSA = Math.cos(moonSelfAngle);
+        const sinSA = Math.sin(moonSelfAngle);
+        moonFrostPatches.push({
+          lnx:  nnx * cosSA + nnz * sinSA,
+          lny:  nny,
+          lnz: -nnx * sinSA + nnz * cosSA,
+          startTime: Date.now(),
+        });
+      }
     });
 
     window.triggerGlobeRipple = function(impX, impY) {
