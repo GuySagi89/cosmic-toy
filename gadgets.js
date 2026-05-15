@@ -104,11 +104,16 @@
   document.addEventListener('pointermove', e => {
     if (!cursorEl) return;
     moveCursor(e.clientX, e.clientY);
+    if (e.pointerType !== 'mouse') return; // touch cursor visibility is managed by down/up
     const over = document.elementFromPoint(e.clientX, e.clientY);
     cursorEl.style.opacity = (over && inventory.contains(over)) ? '0' : '1';
   }, { capture: true });
 
   function onDown(e) {
+    if (e.pointerType !== 'mouse' && cursorEl) {
+      moveCursor(e.clientX, e.clientY);
+      cursorEl.style.opacity = '1';
+    }
     isDragging = true;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
@@ -149,6 +154,7 @@
   }
 
   function onUp(e) {
+    if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     if (!isDragging) return;
     isDragging = false;
     hideDragFeedback();
@@ -200,7 +206,8 @@
     }
   }
 
-  function onCancel() {
+  function onCancel(e) {
+    if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     if (!isDragging) return;
     isDragging = false;
     hideDragFeedback();
