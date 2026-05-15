@@ -6,7 +6,6 @@
   let activeGadget      = null;
   let overlay           = null;
   let cursorEl          = null;
-  let originEl          = null;
   let svgEl             = null;
   let pathEl            = null;
   let gradEl            = null;
@@ -25,14 +24,10 @@
     cursorEl.style.top  = y + 'px';
   }
 
-  function showDragOrigin(x, y, type) {
-    originEl = document.createElement('div');
-    originEl.className = `gadget-origin-dot gadget-origin-dot--${type}`;
-    originEl.style.left = x + 'px';
-    originEl.style.top  = y + 'px';
-    document.body.appendChild(originEl);
+  const TRAIL_MS = 1100;
 
-    dragPath = [{ x, y }];
+  function showDragOrigin(x, y, type) {
+    dragPath = [{ x, y, t: performance.now() }];
 
     const NS    = 'http://www.w3.org/2000/svg';
     const color = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
@@ -71,35 +66,41 @@
     svgEl.appendChild(pathEl);
 
     document.body.appendChild(svgEl);
+    requestAnimationFrame(animateTrail);
+  }
+
+  function animateTrail() {
+    if (!svgEl || !pathEl) return;
+    const cutoff = performance.now() - TRAIL_MS;
+    while (dragPath.length > 1 && dragPath[0].t < cutoff) dragPath.shift();
+    if (dragPath.length >= 2) {
+      const last = dragPath[dragPath.length - 1];
+      let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
+      for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
+      pathEl.setAttribute('d', d);
+      gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
+      gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
+    } else {
+      pathEl.setAttribute('d', '');
+    }
+    requestAnimationFrame(animateTrail);
   }
 
   function updateDragFeedback(cx, cy) {
     if (!cursorEl || !pathEl) return;
-
     const last = dragPath[dragPath.length - 1];
     if (Math.hypot(cx - last.x, cy - last.y) > 2) {
-      dragPath.push({ x: cx, y: cy });
-      if (dragPath.length > 200) dragPath.shift();
+      dragPath.push({ x: cx, y: cy, t: performance.now() });
     }
-
-    let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
-    for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
-    pathEl.setAttribute('d', d);
-
-    gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
-    gradEl.setAttribute('x2', cx);            gradEl.setAttribute('y2', cy);
-
     const dx = cx - dragStartX, dy = cy - dragStartY;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 4) {
+    if (Math.hypot(dx, dy) > 4) {
       const angle = Math.atan2(dy, dx) * 180 / Math.PI;
       cursorEl.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
     }
   }
 
   function hideDragFeedback() {
-    if (originEl) { originEl.remove(); originEl = null; }
-    if (svgEl)    { svgEl.remove();    svgEl = null; pathEl = null; gradEl = null; }
+    if (svgEl) { svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; }
     dragPath = [];
     if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
   }

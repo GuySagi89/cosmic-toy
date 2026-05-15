@@ -104,6 +104,10 @@ body {
   cursor: pointer;
   touch-action: none;
   flex-shrink: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #gadget-blackhole {
@@ -198,7 +202,13 @@ body {
   z-index: 101;
 }
 
-.gadget-slot:hover .gadget-tooltip,
+@media (hover: hover) {
+  .gadget-slot:hover .gadget-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 .gadget-slot.show-tooltip .gadget-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
