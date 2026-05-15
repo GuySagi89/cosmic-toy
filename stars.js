@@ -493,6 +493,7 @@
 
   window.addEventListener('resize', () => { if (active) resize(); });
 
+  document.addEventListener('touchstart',  e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
   document.addEventListener('touchmove',   e => e.preventDefault(), { passive: false });
   document.addEventListener('contextmenu', e => e.preventDefault());
   if ('ongesturestart' in window) {

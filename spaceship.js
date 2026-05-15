@@ -6,6 +6,8 @@
   let spaceship    = null;
   let shipImpacts  = [];
   let shipDebris   = [];
+  let lasers       = [];
+  let laserImpacts = [];
 
   function lerpAngle(a, b, t) {
     let d = (b - a) % (Math.PI * 2);
@@ -250,6 +252,53 @@
       d.y     += d.vy * dt;
       d.angle += d.angVel * dt;
     }
+    for (let i = laserImpacts.length - 1; i >= 0; i--) {
+      laserImpacts[i].age += dt;
+      if (laserImpacts[i].age >= laserImpacts[i].maxAge) laserImpacts.splice(i, 1);
+    }
+
+    if (lasers.length > 0) {
+      const lGlobeEl = document.getElementById('globe-canvas');
+      const lgr      = lGlobeEl ? lGlobeEl.getBoundingClientRect() : null;
+      const lmoon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        const l   = lasers[i];
+        l.age    += dt;
+        l.trail.unshift({ x: l.x, y: l.y });
+        if (l.trail.length > 6) l.trail.pop();
+        l.x += l.vx * dt;
+        l.y += l.vy * dt;
+
+        let lhit = false;
+        const lspd = Math.hypot(l.vx, l.vy);
+        const lnx  = l.vx / lspd, lny = l.vy / lspd;
+
+        if (lgr) {
+          const gcx = lgr.left + lgr.width  * 0.5;
+          const gcy = lgr.top  + lgr.height * 0.5;
+          if (Math.hypot(l.x - gcx, l.y - gcy) < lgr.width * 0.22) {
+            window.dispatchEvent(new CustomEvent('comet-globe-impact', {
+              detail: { x: l.x, y: l.y, vx: lnx * 280, vy: lny * 280, source: 'laser' }
+            }));
+            laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
+            lhit = true;
+          }
+        }
+        if (!lhit && lmoon && Math.hypot(l.x - lmoon.x, l.y - lmoon.y) < lmoon.r * 1.3) {
+          window.dispatchEvent(new CustomEvent('comet-moon-impact', {
+            detail: { x: l.x, y: l.y, vx: lnx * 280, vy: lny * 280, source: 'laser' }
+          }));
+          laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
+          lhit = true;
+        }
+        if (lhit || l.age > 3.5 ||
+            l.x < -60 || l.x > canvas.width  + 60 ||
+            l.y < -60 || l.y > canvas.height + 60) {
+          lasers.splice(i, 1);
+        }
+      }
+    }
+
     if (!spaceship) return;
 
     if (spaceship.exploding) {
@@ -302,7 +351,13 @@
     spaceship.y += spaceship.vy * dt;
 
     const spd = Math.hypot(spaceship.vx, spaceship.vy);
-    if (spd > 12) {
+    if (spaceship._aimX != null) {
+      const aimDx = spaceship._aimX - spaceship.x;
+      const aimDy = spaceship._aimY - spaceship.y;
+      if (Math.hypot(aimDx, aimDy) > 5) {
+        spaceship.angle = Math.atan2(aimDy, aimDx) + Math.PI / 2;
+      }
+    } else if (spd > 12) {
       spaceship.angle = lerpAngle(
         spaceship.angle,
         Math.atan2(spaceship.vy, spaceship.vx) + Math.PI / 2,
@@ -409,9 +464,73 @@
 
   }
 
+  function drawLasers() {
+    const gs = window.gadgetScale || 1;
+
+    for (const imp of laserImpacts) {
+      const frac = imp.age / imp.maxAge;
+      if (frac < 0.4) {
+        const f2 = frac / 0.4;
+        const r  = (1 - f2) * 22 * gs;
+        const fg = ctx.createRadialGradient(imp.x, imp.y, 0, imp.x, imp.y, r);
+        fg.addColorStop(0,   `rgba(255, 255, 200, ${(1 - f2) * 0.95})`);
+        fg.addColorStop(0.3, `rgba(255, 80,  20, ${(1 - f2) * 0.70})`);
+        fg.addColorStop(1,   'rgba(180, 0, 0, 0)');
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.arc(imp.x, imp.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.save();
+      ctx.globalAlpha = (1 - frac) * 0.85;
+      ctx.strokeStyle = frac < 0.5 ? '#ff6030' : '#cc1000';
+      ctx.lineWidth   = ((1 - frac) * 2.5 + 0.3) * gs;
+      ctx.shadowColor = 'rgba(255, 60, 0, 1)';
+      ctx.shadowBlur  = 12 * (1 - frac);
+      ctx.beginPath();
+      ctx.arc(imp.x, imp.y, Math.max(0.5, frac * 30 * gs), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const l of lasers) {
+      const pts = [{ x: l.x, y: l.y }, ...l.trail];
+      if (pts.length >= 2) {
+        ctx.save();
+        ctx.lineCap = 'round';
+        for (let i = 0; i < pts.length - 1; i++) {
+          const t = 1 - i / pts.length;
+          ctx.globalAlpha = t * 0.88;
+          ctx.strokeStyle = i < 2 ? 'rgba(255, 200, 120, 1)' : 'rgba(255, 30, 0, 0.85)';
+          ctx.lineWidth   = Math.max(0.5, (2.8 - i * 0.35) * gs);
+          ctx.shadowColor = 'rgba(255, 60, 0, 1)';
+          ctx.shadowBlur  = 14 * t;
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.shadowColor = 'rgba(255, 60, 0, 1)';
+      ctx.shadowBlur  = 20 * gs;
+      const hg = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, 7 * gs);
+      hg.addColorStop(0,   'rgba(255, 255, 255, 1)');
+      hg.addColorStop(0.4, 'rgba(255, 100, 30, 0.85)');
+      hg.addColorStop(1,   'rgba(200, 0, 0, 0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, 7 * gs, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawSpaceship() {
     drawShipImpacts();
     drawShipDebris();
+    drawLasers();
     if (!spaceship) return;
     ctx.save();
 
@@ -670,6 +789,21 @@
   };
   window.releaseSpaceship = function() {
     if (spaceship) spaceship.active = false;
+  };
+
+  window.fireSpaceshipLaser = function(targetX, targetY) {
+    if (!spaceship || spaceship.exploding || spaceship.swirl) return;
+    const dx   = targetX - spaceship.x;
+    const dy   = targetY - spaceship.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+    const nx = dx / dist, ny = dy / dist;
+    spaceship.angle = Math.atan2(ny, nx) + Math.PI / 2;
+    lasers.push({
+      x: spaceship.x + nx * 18, y: spaceship.y + ny * 18,
+      vx: nx * 1100, vy: ny * 1100,
+      age: 0, trail: [],
+    });
   };
 
   window.Spaceship = {

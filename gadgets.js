@@ -232,6 +232,17 @@
   document.addEventListener('pointermove', e => {
     if (!cursorEl) return;
     moveCursor(e.clientX, e.clientY);
+
+    // Left button released while we missed the pointerup (e.g. capture dropped by contextmenu)
+    if (isDragging && !(e.buttons & 1)) {
+      isDragging = false;
+      hideDragFeedback();
+      if (activeGadget === 'spaceship') {
+        if (cursorEl) cursorEl.classList.remove('pressing');
+        window.releaseSpaceship && window.releaseSpaceship();
+      }
+    }
+
     if (e.pointerType !== 'mouse') return; // touch cursor visibility is managed by down/up
     const over = document.elementFromPoint(e.clientX, e.clientY);
     cursorEl.style.opacity = (over && inventory.contains(over)) ? '0'
@@ -239,6 +250,7 @@
   }, { capture: true });
 
   function onDown(e) {
+    if (e.button !== 0) return;
     if (e.pointerType !== 'mouse' && cursorEl) {
       moveCursor(e.clientX, e.clientY);
       cursorEl.style.opacity = '1';
@@ -269,6 +281,13 @@
 
   function onMove(e) {
     moveCursor(e.clientX, e.clientY);
+    if (activeGadget === 'spaceship' && e.pointerType === 'mouse') {
+      const ship = window.Spaceship && window.Spaceship.get();
+      if (ship && !ship.exploding && !ship.swirl) {
+        ship._aimX = e.clientX;
+        ship._aimY = e.clientY;
+      }
+    }
     if (!isDragging) return;
 
     if (activeGadget === 'spaceship') {
@@ -288,6 +307,7 @@
   }
 
   function onUp(e) {
+    if (e.button !== 0) return;
     if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     if (!isDragging) return;
     isDragging = false;
@@ -390,4 +410,15 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && activeGadget) setActiveGadget(activeGadget);
   });
+
+  document.addEventListener('contextmenu', e => {
+    if (activeGadget === 'spaceship') {
+      e.preventDefault();
+      window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
+    }
+  });
+
+  // Fallback: catch pointer release even when the overlay loses capture (e.g. after contextmenu)
+  window.addEventListener('pointerup',     onUp);
+  window.addEventListener('pointercancel', onCancel);
 })();
