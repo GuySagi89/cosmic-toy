@@ -79,8 +79,18 @@
         ghost.style.top  = e.clientY + 'px';
         meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
         if (meteorDragHistory.length > 10) meteorDragHistory.shift();
-        const angle = Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
-        ghost.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
+        const mn = meteorDragHistory.length;
+        let mAngle;
+        if (mn >= 2) {
+          const vdx = meteorDragHistory[mn - 1].x - meteorDragHistory[0].x;
+          const vdy = meteorDragHistory[mn - 1].y - meteorDragHistory[0].y;
+          mAngle = Math.hypot(vdx, vdy) > 4
+            ? Math.atan2(vdy, vdx) * 180 / Math.PI
+            : Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
+        } else {
+          mAngle = Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
+        }
+        ghost.style.transform = `translate(-50%, -50%) rotate(${mAngle + 90}deg)`;
       }
     });
 
@@ -120,8 +130,18 @@
       } else if (gadgetType === 'meteor-shower') {
         if (ghost) { ghost.remove(); ghost = null; }
         if (!onInventory && window.spawnMeteorShower) {
-          const dx = e.clientX - slotCX;
-          const dy = e.clientY - slotCY;
+          const now    = performance.now();
+          const recent = meteorDragHistory.filter(p => now - p.t < 100);
+          let dx = 0, dy = 0;
+          if (recent.length >= 2) {
+            const first = recent[0], last = recent[recent.length - 1];
+            const dtSec = (last.t - first.t) / 1000;
+            if (dtSec > 0.005) { dx = (last.x - first.x) / dtSec; dy = (last.y - first.y) / dtSec; }
+          }
+          if (Math.hypot(dx, dy) < 50) {
+            dx = e.clientX - slotCX;
+            dy = e.clientY - slotCY;
+          }
           if (Math.hypot(dx, dy) > 15) {
             window.spawnMeteorShower(e.clientX, e.clientY, dx, dy);
           }

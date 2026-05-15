@@ -3,7 +3,9 @@
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
 
-  let spaceship = null;
+  let spaceship    = null;
+  let shipImpacts  = [];
+  let shipDebris   = [];
 
   function lerpAngle(a, b, t) {
     let d = (b - a) % (Math.PI * 2);
@@ -32,42 +34,190 @@
     });
   }
 
+  function spawnBounceDebris(x, y, vx, vy) {
+    if (!window.smokeParticles) return;
+    const spd = Math.hypot(vx, vy) || 1;
+    const nx  = vx / spd, ny = vy / spd;
+    for (let i = 0; i < 28; i++) {
+      const spread = (Math.random() - 0.5) * Math.PI * 2.0;
+      const cs = Math.cos(spread), ss = Math.sin(spread);
+      const dx = nx * cs - ny * ss, dy = nx * ss + ny * cs;
+      const s  = 90 + Math.random() * 180;
+      const ml = 0.30 + Math.random() * 0.30;
+      window.smokeParticles.push({
+        x: x + (Math.random() - 0.5) * 10,
+        y: y + (Math.random() - 0.5) * 10,
+        vx: dx * s, vy: dy * s,
+        life: ml, maxLife: ml,
+        r: 2.5 + Math.random() * 3.5,
+        core: Math.random() < 0.5,
+      });
+    }
+  }
+
+  function spawnShipImpact(x, y) {
+    shipImpacts.push({ x, y, age: 0, maxAge: 0.50 });
+  }
+
+  function drawShipImpacts() {
+    for (const imp of shipImpacts) {
+      const frac = imp.age / imp.maxAge;
+
+      // Central flash — bright white-purple burst
+      if (frac < 0.30) {
+        const f2  = frac / 0.30;
+        const fr  = 55 * (1 - f2);
+        const fg  = ctx.createRadialGradient(imp.x, imp.y, 0, imp.x, imp.y, fr);
+        fg.addColorStop(0,    `rgba(255, 248, 255, ${(1 - f2) * 0.98})`);
+        fg.addColorStop(0.25, `rgba(210, 170, 255, ${(1 - f2) * 0.80})`);
+        fg.addColorStop(0.60, `rgba(130,  70, 255, ${(1 - f2) * 0.45})`);
+        fg.addColorStop(1,    'rgba(60, 20, 180, 0)');
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.arc(imp.x, imp.y, fr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Primary expanding ring
+      const r1 = frac * 75;
+      ctx.save();
+      ctx.shadowColor = 'rgba(190, 130, 255, 1)';
+      ctx.shadowBlur  = 14 * (1 - frac);
+      ctx.globalAlpha = (1 - frac) * 0.90;
+      ctx.strokeStyle = frac < 0.45 ? '#e8d8ff' : '#a060ff';
+      ctx.lineWidth   = 3.5 * (1 - frac) + 0.4;
+      ctx.beginPath();
+      ctx.arc(imp.x, imp.y, Math.max(0.5, r1), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Secondary ring, slightly delayed
+      if (frac > 0.12) {
+        const f2 = (frac - 0.12) / 0.88;
+        const r2 = f2 * 45;
+        ctx.save();
+        ctx.globalAlpha = (1 - f2) * 0.55;
+        ctx.strokeStyle = '#cc99ff';
+        ctx.lineWidth   = 2.0 * (1 - f2) + 0.2;
+        ctx.beginPath();
+        ctx.arc(imp.x, imp.y, Math.max(0.5, r2), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // Debris shape library — points in local space, roughly matching the ship silhouette
+  const DEBRIS_SHAPES = [
+    [[0,-12],[-3,0],[3,0]],                        // nose tip
+    [[-12,7],[-5,2],[-3,-3]],                      // left wing
+    [[12,7],[5,2],[3,-3]],                         // right wing
+    [[-3,-12],[3,-12],[2,-3],[-2,-3]],             // upper hull
+    [[-4,0],[4,0],[3,7],[-3,7]],                   // mid hull
+    [[-2,8],[2,8],[3,13],[-3,13]],                 // engine block
+    [[-8,3],[-4,-1],[-2,5]],                       // left strut
+    [[8,3],[4,-1],[2,5]],                          // right strut
+    [[0,-8],[-5,2],[1,5]],                         // shard A
+    [[2,-5],[6,0],[-1,6],[-4,1]],                  // shard B
+  ];
+
+  function spawnExplosionDebris(cx, cy, baseAngle) {
+    for (const shape of DEBRIS_SHAPES) {
+      const angle  = Math.random() * Math.PI * 2;
+      const speed  = 70 + Math.random() * 220;
+      const maxAge = 0.7 + Math.random() * 0.6;
+      shipDebris.push({
+        x: cx + (Math.random() - 0.5) * 14,
+        y: cy + (Math.random() - 0.5) * 14,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        angle: baseAngle + (Math.random() - 0.5) * Math.PI,
+        angVel: (Math.random() - 0.5) * 9,
+        age: 0, maxAge, shape,
+      });
+    }
+  }
+
+  function drawShipDebris() {
+    for (const d of shipDebris) {
+      const frac  = d.age / d.maxAge;
+      const alpha = Math.pow(1 - frac, 1.4);
+      if (alpha < 0.02) continue;
+      // bright white-purple → ship purple → dark purple
+      const t = Math.min(1, frac * 2.0);
+      const r = Math.round(t < 0.5 ? 225 - t * 2 * 80  : 145 - (t - 0.5) * 2 * 95);
+      const g = Math.round(t < 0.5 ? 210 - t * 2 * 125 :  85 - (t - 0.5) * 2 * 60);
+      const b = Math.round(t < 0.5 ? 255 - t * 2 * 25  : 230 - (t - 0.5) * 2 * 160);
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.angle);
+      ctx.globalAlpha  = alpha;
+      ctx.strokeStyle  = `rgb(${r},${g},${b})`;
+      ctx.lineWidth    = 1.6;
+      ctx.lineJoin     = 'round';
+      ctx.shadowColor  = `rgb(${r},${g},${b})`;
+      ctx.shadowBlur   = 6 * alpha;
+      ctx.beginPath();
+      ctx.moveTo(d.shape[0][0], d.shape[0][1]);
+      for (let i = 1; i < d.shape.length; i++) ctx.lineTo(d.shape[i][0], d.shape[i][1]);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function triggerShipExplosion() {
     if (!spaceship || spaceship.exploding) return;
     spaceship.active        = false;
     spaceship.exploding     = true;
     spaceship.explodeAge    = 0;
-    spaceship.explodeMaxAge = 1.8;
+    spaceship.explodeMaxAge = 1.1;
 
-    for (let i = 0; i < 42; i++) {
-      const angle   = (Math.PI * 2 * i / 42) + (Math.random() - 0.5) * 0.55;
-      const speed   = 140 + Math.random() * 340;
-      const maxLife = 0.55 + Math.random() * 0.85;
+    // Fast directional burst
+    for (let i = 0; i < 60; i++) {
+      const angle   = (Math.PI * 2 * i / 60) + (Math.random() - 0.5) * 0.55;
+      const speed   = 180 + Math.random() * 420;
+      const maxLife = 0.35 + Math.random() * 0.45;
       window.smokeParticles.push({
-        x: spaceship.x + (Math.random() - 0.5) * 12,
-        y: spaceship.y + (Math.random() - 0.5) * 12,
+        x: spaceship.x + (Math.random() - 0.5) * 14,
+        y: spaceship.y + (Math.random() - 0.5) * 14,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
         life: maxLife, maxLife,
-        r: 3.5 + Math.random() * 5.5,
+        r: 4 + Math.random() * 6,
         core: Math.random() < 0.55,
       });
     }
-    for (let i = 0; i < 22; i++) {
+    // Slow expanding fireball cloud
+    for (let i = 0; i < 32; i++) {
       const angle   = Math.random() * Math.PI * 2;
-      const speed   = 18 + Math.random() * 65;
-      const maxLife = 0.9 + Math.random() * 0.85;
+      const speed   = 15 + Math.random() * 70;
+      const maxLife = 0.55 + Math.random() * 0.55;
       window.smokeParticles.push({
-        x: spaceship.x + (Math.random() - 0.5) * 18,
-        y: spaceship.y + (Math.random() - 0.5) * 18,
+        x: spaceship.x + (Math.random() - 0.5) * 22,
+        y: spaceship.y + (Math.random() - 0.5) * 22,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
         life: maxLife, maxLife,
-        r: 7 + Math.random() * 10,
+        r: 9 + Math.random() * 13,
         core: false,
       });
     }
+
+    spawnExplosionDebris(spaceship.x, spaceship.y, spaceship.angle);
   }
 
   function updateSpaceship(dt) {
+    for (let i = shipImpacts.length - 1; i >= 0; i--) {
+      shipImpacts[i].age += dt;
+      if (shipImpacts[i].age >= shipImpacts[i].maxAge) shipImpacts.splice(i, 1);
+    }
+    for (let i = shipDebris.length - 1; i >= 0; i--) {
+      const d = shipDebris[i];
+      d.age   += dt;
+      if (d.age >= d.maxAge) { shipDebris.splice(i, 1); continue; }
+      d.x     += d.vx * dt;
+      d.y     += d.vy * dt;
+      d.angle += d.angVel * dt;
+    }
     if (!spaceship) return;
 
     if (spaceship.exploding) {
@@ -153,7 +303,8 @@
             const inVx = spaceship.vx, inVy = spaceship.vy;
             spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
             spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
-            window.spawnImpactDebris && window.spawnImpactDebris(spaceship.x, spaceship.y);
+            spawnBounceDebris(spaceship.x, spaceship.y, inVx, inVy);
+            spawnShipImpact(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-globe-impact',
               { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy, source: 'spaceship' } }));
             spaceship.hits++;
@@ -181,7 +332,8 @@
             const inVx = spaceship.vx, inVy = spaceship.vy;
             spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
             spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
-            window.spawnImpactDebris && window.spawnImpactDebris(spaceship.x, spaceship.y);
+            spawnBounceDebris(spaceship.x, spaceship.y, inVx, inVy);
+            spawnShipImpact(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-moon-impact',
               { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
             spaceship.hits++;
@@ -213,6 +365,8 @@
   }
 
   function drawSpaceship() {
+    drawShipImpacts();
+    drawShipDebris();
     if (!spaceship) return;
     ctx.save();
 
@@ -220,41 +374,97 @@
       const prog    = spaceship.explodeAge / spaceship.explodeMaxAge;
       const easeOut = t => 1 - Math.pow(1 - t, 3);
 
-      const flashPeak = Math.sin(prog * Math.PI);
+      // White-hot core flash with fire-to-purple gradient
+      const flashPeak = Math.sin(prog * Math.PI * 0.7) * (1 - prog * 0.5);
       if (flashPeak > 0.01) {
-        const flash = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 145);
-        flash.addColorStop(0,    `rgba(255, 252, 255, ${flashPeak * 0.98})`);
-        flash.addColorStop(0.06, `rgba(255, 215, 255, ${flashPeak * 0.74})`);
-        flash.addColorStop(0.22, `rgba(175,  95, 255, ${flashPeak * 0.40})`);
-        flash.addColorStop(0.55, `rgba(100,  45, 200, ${flashPeak * 0.16})`);
+        const flash = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 220);
+        flash.addColorStop(0,    `rgba(255, 255, 255,  ${flashPeak * 0.99})`);
+        flash.addColorStop(0.04, `rgba(255, 245, 200,  ${flashPeak * 0.95})`);
+        flash.addColorStop(0.12, `rgba(255, 160,  40,  ${flashPeak * 0.75})`);
+        flash.addColorStop(0.28, `rgba(200,  80, 255,  ${flashPeak * 0.45})`);
+        flash.addColorStop(0.55, `rgba( 90,  30, 180,  ${flashPeak * 0.18})`);
         flash.addColorStop(1,    'rgba(0, 0, 0, 0)');
         ctx.fillStyle = flash;
         ctx.beginPath();
-        ctx.arc(spaceship.x, spaceship.y, 145, 0, Math.PI * 2);
+        ctx.arc(spaceship.x, spaceship.y, 220, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      const wave1R = easeOut(prog) * 230;
-      ctx.beginPath();
-      ctx.arc(spaceship.x, spaceship.y, wave1R, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(230, 200, 255, ${(1 - prog) * 0.92})`;
-      ctx.lineWidth   = 5.5 * (1 - prog) + 0.4;
-      ctx.shadowColor = 'rgba(215, 180, 255, 1)';
-      ctx.shadowBlur  = 32;
-      ctx.stroke();
-      ctx.shadowBlur  = 0;
-
-      if (prog > 0.12) {
-        const p2     = (prog - 0.12) / 0.88;
-        const wave2R = easeOut(p2) * 165;
+      // Fast shockwave — fire-orange, gone by halfway
+      const shockFrac = Math.min(1, prog * 2.2);
+      if (shockFrac < 1) {
+        const shockR = easeOut(shockFrac) * 340;
+        ctx.save();
+        ctx.globalAlpha = (1 - shockFrac) * 0.80;
+        ctx.shadowColor = 'rgba(255, 200, 80, 1)';
+        ctx.shadowBlur  = 22;
+        ctx.strokeStyle = `rgba(255, 210, 100, ${(1 - shockFrac) * 0.85})`;
+        ctx.lineWidth   = 5.5 * (1 - shockFrac) + 0.4;
         ctx.beginPath();
-        ctx.arc(spaceship.x, spaceship.y, wave2R, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(200, 158, 255, ${(1 - p2) * 0.58})`;
-        ctx.lineWidth   = 3.2 * (1 - p2) + 0.3;
-        ctx.shadowColor = 'rgba(190, 148, 255, 1)';
-        ctx.shadowBlur  = 18;
+        ctx.arc(spaceship.x, spaceship.y, Math.max(1, shockR), 0, Math.PI * 2);
         ctx.stroke();
-        ctx.shadowBlur  = 0;
+        ctx.restore();
+      }
+
+      // Fire ring — orange, mid-speed
+      if (prog > 0.04) {
+        const pf     = (prog - 0.04) / 0.96;
+        const fireR  = easeOut(pf) * 200;
+        ctx.save();
+        ctx.globalAlpha = (1 - pf) * 0.70;
+        ctx.shadowColor = 'rgba(255, 120, 30, 1)';
+        ctx.shadowBlur  = 18;
+        ctx.strokeStyle = `rgba(255, 145, 50, ${(1 - pf) * 0.80})`;
+        ctx.lineWidth   = 4.0 * (1 - pf) + 0.3;
+        ctx.beginPath();
+        ctx.arc(spaceship.x, spaceship.y, Math.max(1, fireR), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Primary purple ring
+      const wave1R = easeOut(prog) * 270;
+      ctx.save();
+      ctx.globalAlpha = (1 - prog) * 0.92;
+      ctx.shadowColor = 'rgba(215, 180, 255, 1)';
+      ctx.shadowBlur  = 36;
+      ctx.strokeStyle = `rgba(230, 200, 255, ${(1 - prog) * 0.95})`;
+      ctx.lineWidth   = 6.0 * (1 - prog) + 0.4;
+      ctx.beginPath();
+      ctx.arc(spaceship.x, spaceship.y, Math.max(1, wave1R), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Secondary purple ring, delayed
+      if (prog > 0.10) {
+        const p2     = (prog - 0.10) / 0.90;
+        const wave2R = easeOut(p2) * 190;
+        ctx.save();
+        ctx.globalAlpha = (1 - p2) * 0.62;
+        ctx.shadowColor = 'rgba(190, 148, 255, 1)';
+        ctx.shadowBlur  = 20;
+        ctx.strokeStyle = `rgba(200, 158, 255, ${(1 - p2) * 0.70})`;
+        ctx.lineWidth   = 3.5 * (1 - p2) + 0.3;
+        ctx.beginPath();
+        ctx.arc(spaceship.x, spaceship.y, Math.max(1, wave2R), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Third ring — cool blue-purple trailing wave
+      if (prog > 0.22) {
+        const p3     = (prog - 0.22) / 0.78;
+        const wave3R = easeOut(p3) * 130;
+        ctx.save();
+        ctx.globalAlpha = (1 - p3) * 0.45;
+        ctx.shadowColor = 'rgba(130, 180, 255, 1)';
+        ctx.shadowBlur  = 14;
+        ctx.strokeStyle = `rgba(160, 200, 255, ${(1 - p3) * 0.55})`;
+        ctx.lineWidth   = 2.4 * (1 - p3) + 0.2;
+        ctx.beginPath();
+        ctx.arc(spaceship.x, spaceship.y, Math.max(1, wave3R), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
     }
 
@@ -264,7 +474,7 @@
     const cl = (a, b, t) => Math.round(a + (b - a) * t);
     let fl = 0, warnFreq = 0;
     if (hits >= 7) {
-      warnFreq = [0.7, 1.3, 2.2][Math.min(hits - 7, 2)];
+      warnFreq = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 7), 2)];
       fl = (Math.sin(now / 1000 * warnFreq * Math.PI * 2) + 1) / 2;
     }
     const topR = cl(cl(192, 255, hitFrac), 255, fl * 0.92);
@@ -349,6 +559,52 @@
     ctx.stroke();
 
     ctx.restore();
+
+    // Health bar — screen-aligned, below the ship
+    if (!spaceship.exploding && !spaceship.swirl && spaceship.alpha > 0.05) {
+      const health = Math.max(0, (10 - spaceship.hits) / 10);
+      const BAR_W  = 36, BAR_H = 4;
+      const bx     = spaceship.x - BAR_W / 2;
+      const by     = spaceship.y + 22;
+
+      ctx.save();
+      ctx.globalAlpha = spaceship.alpha * 0.85;
+
+      // Dark background track
+      ctx.fillStyle = 'rgba(15, 5, 40, 0.72)';
+      ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
+
+      // Fill color: ship purple → orange → red as damage increases
+      if (health > 0) {
+        const dmg = 1 - health;
+        let fr, fg, fb;
+        if (dmg < 0.5) {
+          fr = Math.round(150 + dmg * 2 * 105);
+          fg = Math.round( 90 + dmg * 2 *  50);
+          fb = Math.round(255 - dmg * 2 * 215);
+        } else {
+          fr = 255;
+          fg = Math.round(140 - (dmg - 0.5) * 2 * 140);
+          fb = Math.round( 40 - (dmg - 0.5) * 2 *  40);
+        }
+
+        let barAlpha = 0.92;
+        if (health <= 0.3 && hits >= 7) {
+          const pf = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 7), 2)];
+          barAlpha  = 0.60 + ((Math.sin(Date.now() / 1000 * pf * Math.PI * 2) + 1) / 2) * 0.40;
+        }
+
+        ctx.fillStyle = `rgba(${fr}, ${fg}, ${fb}, ${barAlpha})`;
+        ctx.fillRect(bx, by, BAR_W * health, BAR_H);
+      }
+
+      // Subtle border
+      ctx.strokeStyle = 'rgba(140, 90, 215, 0.45)';
+      ctx.lineWidth   = 0.8;
+      ctx.strokeRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
+
+      ctx.restore();
+    }
   }
 
   window.startSpaceship = function(x, y) {
@@ -366,5 +622,12 @@
     draw:             drawSpaceship,
     get:              () => spaceship,
     triggerExplosion: triggerShipExplosion,
+    hit(x, y, vx, vy, damage) {
+      if (!spaceship || spaceship.exploding || spaceship.swirl) return;
+      spaceship.hits += damage;
+      spawnShipImpact(x, y);
+      spawnBounceDebris(x, y, vx, vy);
+      if (spaceship.hits >= 10) triggerShipExplosion();
+    },
   };
 })();

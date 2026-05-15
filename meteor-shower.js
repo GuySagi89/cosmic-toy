@@ -11,6 +11,7 @@
   const BACK_OFFSET    = 360;   // how far behind release to start spawning
 
   let showers = [];
+  let impacts = [];
 
   function launch(sx, sy, dirX, dirY) {
     const len = Math.hypot(dirX, dirY);
@@ -43,6 +44,7 @@
   }
 
   function update(dt) {
+    const allBHs  = window.BlackHole ? window.BlackHole.getAll() : [];
     const globeEl = document.getElementById('globe-canvas');
     const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
     const moon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
@@ -57,6 +59,35 @@
       for (let mi = s.meteors.length - 1; mi >= 0; mi--) {
         const m = s.meteors[mi];
         m.age += dt;
+
+        // Swirl into black hole
+        if (m.swirl) {
+          const sw = m.swirl;
+          sw.age += dt;
+          const frac = sw.age / sw.maxAge;
+          if (frac >= 1) { s.meteors.splice(mi, 1); continue; }
+          const r   = sw.r * Math.pow(1 - frac, 0.65);
+          sw.angle += (3 + frac * 10) * dt;
+          m.x = sw.bh.x + Math.cos(sw.angle) * r;
+          m.y = sw.bh.y + Math.sin(sw.angle) * r;
+          continue;
+        }
+
+        // Black hole gravity
+        for (const bh of allBHs) {
+          const dx = bh.x - m.x, dy = bh.y - m.y;
+          const d  = Math.hypot(dx, dy);
+          if (d < bh.baseRadius * 3) {
+            m.swirl = { bh, angle: Math.atan2(m.y - bh.y, m.x - bh.x), r: Math.max(d, 4), age: 0, maxAge: 0.75 };
+            break;
+          }
+          if (d < bh.baseRadius * 20) {
+            const g = 18000 / (d * d);
+            m.vx += (dx / d) * g * dt;
+            m.vy += (dy / d) * g * dt;
+          }
+        }
+        if (m.swirl) continue;
 
         m.trail.unshift({ x: m.x, y: m.y });
         if (m.trail.length > 8) m.trail.pop();
@@ -73,7 +104,7 @@
             window.dispatchEvent(new CustomEvent('comet-globe-impact', {
               detail: { x: m.x, y: m.y, vx: m.vx * 0.055, vy: m.vy * 0.055, source: 'meteor' }
             }));
-            microDebris(m.x, m.y, m.vx, m.vy);
+            spawnImpact(m.x, m.y, m.vx, m.vy);
             hit = true;
           }
         }
@@ -82,8 +113,17 @@
           window.dispatchEvent(new CustomEvent('comet-moon-impact', {
             detail: { x: m.x, y: m.y, vx: m.vx * 0.055, vy: m.vy * 0.055, source: 'meteor' }
           }));
-          microDebris(m.x, m.y, m.vx, m.vy);
+          spawnImpact(m.x, m.y, m.vx, m.vy);
           hit = true;
+        }
+
+        if (!hit) {
+          const ship = window.Spaceship && window.Spaceship.get();
+          if (ship && !ship.exploding && Math.hypot(m.x - ship.x, m.y - ship.y) < 18) {
+            window.Spaceship.hit(m.x, m.y, m.vx, m.vy, 0.5);
+            spawnImpact(m.x, m.y, m.vx, m.vy);
+            hit = true;
+          }
         }
 
         if (hit || m.age > 4.5 ||
@@ -95,31 +135,92 @@
 
       if (s.spawned >= COUNT && s.meteors.length === 0) showers.splice(si, 1);
     }
+
+    for (let i = impacts.length - 1; i >= 0; i--) {
+      impacts[i].age += dt;
+      if (impacts[i].age >= impacts[i].maxAge) impacts.splice(i, 1);
+    }
   }
 
-  function microDebris(x, y, vx, vy) {
+  function spawnImpact(x, y, vx, vy) {
+    impacts.push({ x, y, age: 0, maxAge: 0.34 });
+
     if (!window.smokeParticles || window.smokeParticles.length >= 580) return;
-    for (let i = 0; i < 5; i++) {
-      const a  = Math.random() * Math.PI * 2;
-      const sp = 22 + Math.random() * 48;
+    const spd = Math.hypot(vx, vy) || 1;
+    const nx  = vx / spd, ny = vy / spd;
+    for (let i = 0; i < 9; i++) {
+      const spread = (Math.random() - 0.5) * Math.PI * 1.6;
+      const cs = Math.cos(spread), ss = Math.sin(spread);
+      const dx = nx * cs - ny * ss, dy = nx * ss + ny * cs;
+      const sp2 = 35 + Math.random() * 80;
       window.smokeParticles.push({
-        x, y,
-        vx: Math.cos(a) * sp + vx * 0.07,
-        vy: Math.sin(a) * sp + vy * 0.07,
-        life: 0.14 + Math.random() * 0.12, maxLife: 0.26,
-        r: 0.9 + Math.random() * 1.2,
-        core: false, comet: false,
+        x: x + (Math.random() - 0.5) * 4,
+        y: y + (Math.random() - 0.5) * 4,
+        vx: dx * sp2, vy: dy * sp2,
+        life: 0.18 + Math.random() * 0.14, maxLife: 0.32,
+        r: 1 + Math.random() * 1.4,
+        core: Math.random() < 0.45, comet: false,
       });
     }
   }
 
   function draw() {
+    for (const imp of impacts) drawImpact(imp);
     for (const s of showers) {
       for (const m of s.meteors) drawMeteor(m);
     }
   }
 
+  function drawImpact(imp) {
+    const frac = imp.age / imp.maxAge;
+    const r    = frac * 22;
+
+    // Inner flash — only in the first third
+    if (frac < 0.35) {
+      const f2 = frac / 0.35;
+      const fg = ctx.createRadialGradient(imp.x, imp.y, 0, imp.x, imp.y, r * 0.8 + 4);
+      fg.addColorStop(0,   `rgba(255, 255, 230, ${(1 - f2) * 0.75})`);
+      fg.addColorStop(0.5, `rgba(255, 185,  55, ${(1 - f2) * 0.45})`);
+      fg.addColorStop(1,   'rgba(255, 100, 10, 0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(imp.x, imp.y, r * 0.8 + 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Expanding ring
+    ctx.save();
+    ctx.globalAlpha = (1 - frac) * 0.75;
+    ctx.strokeStyle = frac < 0.5 ? '#ffe090' : '#ff8830';
+    ctx.lineWidth   = 1.8 * (1 - frac) + 0.3;
+    ctx.beginPath();
+    ctx.arc(imp.x, imp.y, Math.max(0.5, r), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawMeteor(m) {
+    if (m.swirl) {
+      const frac  = m.swirl.age / m.swirl.maxAge;
+      const scale = Math.max(0, 1 - Math.pow(frac, 0.55));
+      if (scale < 0.02) return;
+      const r = Math.max(0.1, m.r * 3 * scale);
+      ctx.save();
+      ctx.globalAlpha = scale;
+      ctx.shadowColor = 'rgba(255, 160, 40, 1)';
+      ctx.shadowBlur  = 14 * scale;
+      const sg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
+      sg.addColorStop(0,    'rgba(255, 255, 220, 1)');
+      sg.addColorStop(0.4,  'rgba(255, 170,  60, 0.85)');
+      sg.addColorStop(1,    'rgba(255,  80,  10, 0)');
+      ctx.fillStyle = sg;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
     const trailLen = m.trail.length;
 
     if (trailLen >= 2) {
@@ -156,5 +257,20 @@
   }
 
   window.spawnMeteorShower = launch;
-  window.MeteorShower = { update, draw };
+  window.MeteorShower = {
+    update, draw,
+    blastInRadius(cx, cy, r) {
+      for (let si = showers.length - 1; si >= 0; si--) {
+        const s = showers[si];
+        for (let mi = s.meteors.length - 1; mi >= 0; mi--) {
+          const m = s.meteors[mi];
+          if (m.swirl) continue;
+          if (Math.hypot(cx - m.x, cy - m.y) <= r) {
+            spawnImpact(m.x, m.y, m.vx, m.vy);
+            s.meteors.splice(mi, 1);
+          }
+        }
+      }
+    },
+  };
 })();

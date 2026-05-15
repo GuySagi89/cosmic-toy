@@ -5,15 +5,25 @@
 
   let comets = [];
 
-  function spawnImpactDebris(x, y) {
-    for (let i = 0; i < 18; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const spd   = 60 + Math.random() * 120;
+  function spawnImpactDebris(x, y, vx, vy) {
+    const spd  = Math.hypot(vx, vy) || 1;
+    const nx   = vx / spd, ny = vy / spd;
+    for (let i = 0; i < 55; i++) {
+      const directional = i < 36;
+      const spread = directional
+        ? (Math.random() - 0.5) * Math.PI * 1.5
+        : Math.random() * Math.PI * 2;
+      const cs = Math.cos(spread), ss = Math.sin(spread);
+      const dx = directional ? nx * cs - ny * ss : Math.cos(spread);
+      const dy = directional ? nx * ss + ny * cs : Math.sin(spread);
+      const s  = 300 + Math.random() * 500;
+      const ml = 0.9 + Math.random() * 0.7;
       window.smokeParticles.push({
-        x, y,
-        vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
-        life: 0.3 + Math.random() * 0.2, maxLife: 0.5,
-        r: 2 + Math.random() * 3,
+        x: x + (Math.random() - 0.5) * 12,
+        y: y + (Math.random() - 0.5) * 12,
+        vx: dx * s, vy: dy * s,
+        life: ml, maxLife: ml,
+        r: 5 + Math.random() * 10,
         core: Math.random() < 0.5, comet: true,
       });
     }
@@ -48,6 +58,9 @@
   }
 
   function spawnComet(x, y, vx, vy) {
+    const MAX_SPD = 320;
+    const s = Math.hypot(vx, vy);
+    if (s > MAX_SPD) { vx = vx / s * MAX_SPD; vy = vy / s * MAX_SPD; }
     if (comets.length >= 5) blastComet(comets.shift(), x, y);
     comets.push({ x, y, vx, vy });
   }
@@ -111,17 +124,17 @@
       if (window.smokeParticles.length < 600) {
         const spd = Math.hypot(c.vx, c.vy) || 1;
         const bx  = -c.vx / spd, by = -c.vy / spd;
-        for (let j = 0; j < 3; j++) {
-          const spread = (Math.random() - 0.5) * 0.8;
+        for (let j = 0; j < 5; j++) {
+          const spread = (Math.random() - 0.5) * 1.1;
           const cs = Math.cos(spread), ss = Math.sin(spread);
           window.smokeParticles.push({
-            x: c.x + bx * 6 + (Math.random() - 0.5) * 4,
-            y: c.y + by * 6 + (Math.random() - 0.5) * 4,
-            vx: (bx * cs - by * ss) * (20 + Math.random() * 30),
-            vy: (bx * ss + by * cs) * (20 + Math.random() * 30),
-            life: 0.25 + Math.random() * 0.25,
-            maxLife: 0.4,
-            r: 1.5 + Math.random() * 2,
+            x: c.x + bx * 10 + (Math.random() - 0.5) * 6,
+            y: c.y + by * 10 + (Math.random() - 0.5) * 6,
+            vx: (bx * cs - by * ss) * (25 + Math.random() * 45),
+            vy: (bx * ss + by * cs) * (25 + Math.random() * 45),
+            life: 0.35 + Math.random() * 0.3,
+            maxLife: 0.55,
+            r: 2.5 + Math.random() * 3.5,
             core: Math.random() < 0.4,
             comet: true,
           });
@@ -139,7 +152,7 @@
         if (Math.hypot(c.x - gcx, c.y - gcy) < gr.width * 0.22) {
           window.dispatchEvent(new CustomEvent('comet-globe-impact',
             { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
-          spawnImpactDebris(c.x, c.y);
+          spawnImpactDebris(c.x, c.y, c.vx, c.vy);
           comets.splice(i, 1); continue;
         }
       }
@@ -147,14 +160,14 @@
       if (moon && Math.hypot(c.x - moon.x, c.y - moon.y) < moon.r * 1.4) {
         window.dispatchEvent(new CustomEvent('comet-moon-impact',
           { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
-        spawnImpactDebris(c.x, c.y);
+        spawnImpactDebris(c.x, c.y, c.vx, c.vy);
         comets.splice(i, 1); continue;
       }
 
       const ship = window.Spaceship && window.Spaceship.get();
       if (ship && !ship.exploding && Math.hypot(c.x - ship.x, c.y - ship.y) < 22) {
         ship.hits += 3;
-        spawnImpactDebris(c.x, c.y);
+        spawnImpactDebris(c.x, c.y, c.vx, c.vy);
         if (ship.hits >= 10) window.Spaceship.triggerExplosion();
         comets.splice(i, 1); continue;
       }
@@ -167,11 +180,11 @@
         const frac  = c.swirl.age / c.swirl.maxAge;
         const scale = Math.max(0, 1 - Math.pow(frac, 0.55));
         if (scale < 0.02) continue;
-        const r = Math.max(0.1, 10 * scale);
+        const r = Math.max(0.1, 28 * scale);
         ctx.save();
         ctx.globalAlpha = scale;
         ctx.shadowColor = 'rgba(160, 240, 255, 1)';
-        ctx.shadowBlur  = 18 * scale;
+        ctx.shadowBlur  = 50 * scale;
         const cg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
         cg.addColorStop(0,   'rgba(255, 255, 255, 1)');
         cg.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
@@ -189,15 +202,15 @@
       const nx = c.vx / spd, ny = c.vy / spd;
 
       ctx.save();
-      const tailLen = Math.min(60, spd * 0.1);
+      const tailLen = Math.min(200, spd * 0.28);
       const tx = c.x - nx * tailLen, ty = c.y - ny * tailLen;
 
       const tailGrad = ctx.createLinearGradient(c.x, c.y, tx, ty);
-      tailGrad.addColorStop(0,   'rgba(220, 240, 255, 0.80)');
-      tailGrad.addColorStop(0.3, 'rgba(100, 220, 255, 0.45)');
+      tailGrad.addColorStop(0,   'rgba(220, 240, 255, 0.95)');
+      tailGrad.addColorStop(0.3, 'rgba(100, 220, 255, 0.60)');
       tailGrad.addColorStop(1,   'rgba(60, 140, 255, 0)');
       ctx.strokeStyle = tailGrad;
-      ctx.lineWidth   = 3.5;
+      ctx.lineWidth   = 10;
       ctx.lineCap     = 'round';
       ctx.beginPath();
       ctx.moveTo(c.x, c.y);
@@ -205,14 +218,14 @@
       ctx.stroke();
 
       ctx.shadowColor = 'rgba(160, 240, 255, 1)';
-      ctx.shadowBlur  = 18;
-      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 10);
+      ctx.shadowBlur  = 50;
+      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 26);
       coreGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
       coreGrad.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
       coreGrad.addColorStop(1,   'rgba(60, 160, 255, 0)');
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
-      ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
+      ctx.arc(c.x, c.y, 26, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }

@@ -192,6 +192,7 @@
     }
 
     if (window.Comet) window.Comet.blastInRadius(bh.x, bh.y, waveR);
+    if (window.MeteorShower) window.MeteorShower.blastInRadius(bh.x, bh.y, waveR);
   }
 
   window.spawnBlackHole = spawnBlackHole;
