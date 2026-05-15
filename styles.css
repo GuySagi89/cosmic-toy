@@ -111,12 +111,10 @@ body {
   width: var(--slot-size);
   height: var(--slot-size);
   border-radius: 50%;
-  cursor: grab;
+  cursor: pointer;
   touch-action: none;
   flex-shrink: 0;
 }
-
-.gadget-slot:active { cursor: grabbing; }
 
 #gadget-blackhole {
   background: radial-gradient(circle at 38% 38%, #1a004a 0%, #000000 55%);
@@ -131,6 +129,13 @@ body {
   box-shadow:
     0 0 0 1px rgba(210, 180, 255, 0.60),
     0 0 22px 7px rgba(180, 110, 255, 0.72),
+    inset 0 0 10px rgba(0, 0, 0, 0.95);
+}
+
+#gadget-blackhole.active {
+  box-shadow:
+    0 0 0 2px rgba(230, 210, 255, 0.95),
+    0 0 30px 12px rgba(180, 110, 255, 0.95),
     inset 0 0 10px rgba(0, 0, 0, 0.95);
 }
 
@@ -149,6 +154,16 @@ body {
   box-shadow:
     0 0 0 1px rgba(180, 150, 255, 0.52),
     0 0 18px 5px rgba(150, 100, 242, 0.46);
+}
+
+#gadget-spaceship.active {
+  box-shadow:
+    0 0 0 2px rgba(200, 175, 255, 0.95),
+    0 0 26px 9px rgba(150, 100, 242, 0.80);
+}
+
+#gadget-spaceship.active .gadget-ship-icon {
+  filter: drop-shadow(0 0 8px rgba(200, 175, 255, 0.95));
 }
 
 .gadget-ship-icon {
@@ -251,6 +266,13 @@ body {
     0 0 22px 7px rgba(80, 210, 255, 0.70),
     inset 0 0 10px rgba(0, 0, 0, 0.90);
 }
+
+#gadget-comet.active {
+  box-shadow:
+    0 0 0 2px rgba(180, 245, 255, 0.95),
+    0 0 30px 12px rgba(80, 210, 255, 0.90),
+    inset 0 0 10px rgba(0, 0, 0, 0.90);
+}
 #gadget-comet::before {
   content: '';
   position: absolute;
@@ -287,6 +309,13 @@ body {
   box-shadow:
     0 0 0 1px rgba(255, 178, 72, 0.62),
     0 0 22px 7px rgba(220, 98, 26, 0.62),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+}
+
+#gadget-meteor-shower.active {
+  box-shadow:
+    0 0 0 2px rgba(255, 205, 100, 0.95),
+    0 0 30px 12px rgba(220, 98, 26, 0.88),
     inset 0 0 10px rgba(0, 0, 0, 0.92);
 }
 /* Three meteor streaks: position + box-shadow copies */
@@ -353,5 +382,111 @@ body {
   height: calc(var(--slot-size) - 2px);
   background: radial-gradient(circle at 50% 35%, rgba(255,210,100,0.88) 0%, rgba(255,110,25,0.32) 42%, transparent 70%);
   box-shadow: 0 0 12px 5px rgba(255,140,38,0.50);
+}
+
+/* ── Active gadget cursor indicator ── */
+.gadget-cursor {
+  position: fixed;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.gadget-cursor--blackhole {
+  background: radial-gradient(circle at 38% 38%, #1a004a 0%, #000000 55%);
+  box-shadow:
+    0 0 0 1.5px rgba(200, 170, 255, 0.85),
+    0 0 14px 6px rgba(180, 110, 255, 0.78),
+    inset 0 0 8px rgba(0, 0, 0, 0.95);
+}
+
+.gadget-cursor--spaceship {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 55%, rgba(44, 22, 88, 0.65) 0%, rgba(6, 3, 16, 0.80) 70%);
+  box-shadow:
+    0 0 0 1.5px rgba(180, 150, 255, 0.75),
+    0 0 12px 5px rgba(150, 100, 242, 0.60);
+}
+
+.gadget-cursor-ship-svg {
+  width: 65%;
+  height: 65%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(200, 175, 255, 0.80));
+}
+
+.gadget-cursor--comet {
+  background: radial-gradient(circle at 45% 30%, #001a3a 0%, #000814 55%);
+  box-shadow:
+    0 0 0 1.5px rgba(120, 220, 255, 0.75),
+    0 0 14px 6px rgba(60, 180, 255, 0.68),
+    inset 0 0 8px rgba(0, 0, 0, 0.90);
+}
+
+.gadget-cursor--comet::before {
+  content: '';
+  position: absolute;
+  top: 22%; left: 68%;
+  width: 18%; height: 18%;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px 2px rgba(160, 230, 255, 0.80);
+  pointer-events: none;
+}
+
+.gadget-cursor--comet::after {
+  content: '';
+  position: absolute;
+  top: 30%; left: 55%;
+  width: 3px; height: 55%;
+  background: linear-gradient(to bottom, rgba(180, 240, 255, 0.9), transparent);
+  border-radius: 2px;
+  transform: rotate(-40deg) translateX(-50%);
+  pointer-events: none;
+}
+
+.gadget-cursor--meteor-shower {
+  background: radial-gradient(circle at 42% 32%, #1c0900 0%, #060200 65%);
+  box-shadow:
+    0 0 0 1.5px rgba(255, 148, 50, 0.72),
+    0 0 14px 6px rgba(195, 78, 18, 0.65),
+    inset 0 0 8px rgba(0, 0, 0, 0.92);
+  overflow: hidden;
+}
+
+.gadget-cursor--meteor-shower::before {
+  content: '';
+  position: absolute;
+  top: 10%; left: 14%;
+  width: 2px; height: 42%;
+  background: linear-gradient(to bottom, rgba(255,238,175,0.94), rgba(255,155,50,0.40), transparent);
+  border-radius: 2px;
+  transform: rotate(34deg);
+  transform-origin: top left;
+  pointer-events: none;
+  box-shadow: 11px 3px 0 0 rgba(255,220,125,0.80), 22px 6px 0 0 rgba(255,195,85,0.55);
+}
+
+.gadget-cursor--meteor-shower::after {
+  content: '';
+  position: absolute;
+  top: 9%; left: 12%;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(255,255,215,0.97);
+  box-shadow:
+    0 0 5px 2px rgba(255,215,80,0.82),
+    11px 3px 0 0 rgba(255,250,200,0.90),
+    11px 3px 0 3px rgba(255,205,75,0.55),
+    22px 6px 0 -1px rgba(255,240,170,0.75),
+    22px 6px 0 2px rgba(255,180,52,0.42);
+  pointer-events: none;
 }
 

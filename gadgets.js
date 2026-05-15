@@ -3,159 +3,166 @@
   const inventory = document.getElementById('gadget-inventory');
   if (!inventory) return;
 
-  let ghost              = null;
-  let gadgetType         = null;
-  let slotCX             = 0;
-  let slotCY             = 0;
-  let cometDragHistory   = [];
-  let meteorDragHistory  = [];
+  let activeGadget      = null;
+  let overlay           = null;
+  let cursorEl          = null;
+  let isDragging        = false;
+  let dragStartX        = 0;
+  let dragStartY        = 0;
+  let cometDragHistory  = [];
+  let meteorDragHistory = [];
 
-  function spawnGhost(type, clientX, clientY) {
-    ghost = document.createElement('div');
-    ghost.className      = 'gadget-drag-ghost';
-    ghost.dataset.gadget = type;
-    ghost.style.left     = clientX + 'px';
-    ghost.style.top      = clientY + 'px';
-    document.body.appendChild(ghost);
+  const SHIP_SVG = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
+
+  function moveCursor(x, y) {
+    if (!cursorEl) return;
+    cursorEl.style.left = x + 'px';
+    cursorEl.style.top  = y + 'px';
   }
 
-  function cancelDrag(slot) {
-    if (ghost) { ghost.remove(); ghost = null; }
-    if (gadgetType === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
-    gadgetType = null;
-    if (slot) slot.classList.add('no-tooltip');
+  function setActiveGadget(type) {
+    if (isDragging) {
+      isDragging = false;
+      if (activeGadget === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
+    }
+
+    activeGadget = (activeGadget === type) ? null : type;
+
+    inventory.querySelectorAll('.gadget-slot').forEach(s => {
+      s.classList.toggle('active', s.dataset.gadget === activeGadget);
+    });
+
+    if (cursorEl) { cursorEl.remove(); cursorEl = null; }
+    if (activeGadget) {
+      cursorEl = document.createElement('div');
+      cursorEl.className = `gadget-cursor gadget-cursor--${activeGadget}`;
+      if (activeGadget === 'spaceship') cursorEl.innerHTML = SHIP_SVG;
+      cursorEl.style.left = '-100px';
+      cursorEl.style.top  = '-100px';
+      document.body.appendChild(cursorEl);
+    }
+
+    if (activeGadget && !overlay) {
+      overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:50;cursor:none;touch-action:none;';
+      overlay.addEventListener('pointerdown',   onDown);
+      overlay.addEventListener('pointermove',   onMove);
+      overlay.addEventListener('pointerup',     onUp);
+      overlay.addEventListener('pointercancel', onCancel);
+      document.body.appendChild(overlay);
+    } else if (!activeGadget && overlay) {
+      overlay.remove();
+      overlay = null;
+    }
+  }
+
+  // Track cursor even when pointer is over inventory (above the overlay)
+  document.addEventListener('pointermove', e => {
+    if (!cursorEl) return;
+    moveCursor(e.clientX, e.clientY);
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    cursorEl.style.opacity = (over && inventory.contains(over)) ? '0' : '1';
+  }, { capture: true });
+
+  function onDown(e) {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+
+    if (activeGadget === 'blackhole') {
+      window.spawnBlackHole && window.spawnBlackHole(e.clientX, e.clientY);
+      isDragging = false;
+    } else if (activeGadget === 'spaceship') {
+      window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+      overlay.setPointerCapture(e.pointerId);
+    } else if (activeGadget === 'comet') {
+      cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+      overlay.setPointerCapture(e.pointerId);
+    } else if (activeGadget === 'meteor-shower') {
+      meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+      overlay.setPointerCapture(e.pointerId);
+    }
+  }
+
+  function onMove(e) {
+    moveCursor(e.clientX, e.clientY);
+    if (!isDragging) return;
+
+    if (activeGadget === 'spaceship') {
+      window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+    } else if (activeGadget === 'comet') {
+      cometDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+      if (cometDragHistory.length > 10) cometDragHistory.shift();
+    } else if (activeGadget === 'meteor-shower') {
+      meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+      if (meteorDragHistory.length > 10) meteorDragHistory.shift();
+    }
+  }
+
+  function onUp(e) {
+    if (!isDragging) return;
+    isDragging = false;
+
+    if (activeGadget === 'spaceship') {
+      window.releaseSpaceship && window.releaseSpaceship();
+    } else if (activeGadget === 'comet' && window.spawnComet) {
+      const now    = performance.now();
+      const recent = cometDragHistory.filter(p => now - p.t < 100);
+      let vx = 0, vy = 0;
+      if (recent.length >= 2) {
+        const first = recent[0], last = recent[recent.length - 1];
+        const dtSec = (last.t - first.t) / 1000;
+        if (dtSec > 0.005) { vx = (last.x - first.x) / dtSec; vy = (last.y - first.y) / dtSec; }
+      }
+      if (Math.hypot(vx, vy) < 50) {
+        const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+        const len = Math.hypot(dx, dy);
+        if (len > 5) {
+          const spd = Math.min(len * 3.5, 900);
+          vx = (dx / len) * spd; vy = (dy / len) * spd;
+        } else {
+          vx = 0; vy = -500;
+        }
+      } else {
+        const spd = Math.hypot(vx, vy);
+        if (spd > 1200) { vx = vx / spd * 1200; vy = vy / spd * 1200; }
+      }
+      window.spawnComet(e.clientX, e.clientY, vx, vy);
+    } else if (activeGadget === 'meteor-shower' && window.spawnMeteorShower) {
+      const now    = performance.now();
+      const recent = meteorDragHistory.filter(p => now - p.t < 100);
+      let dx = 0, dy = 0;
+      if (recent.length >= 2) {
+        const first = recent[0], last = recent[recent.length - 1];
+        const dtSec = (last.t - first.t) / 1000;
+        if (dtSec > 0.005) { dx = (last.x - first.x) / dtSec; dy = (last.y - first.y) / dtSec; }
+      }
+      if (Math.hypot(dx, dy) < 50) {
+        dx = e.clientX - dragStartX;
+        dy = e.clientY - dragStartY;
+      }
+      if (Math.hypot(dx, dy) > 15) {
+        window.spawnMeteorShower(e.clientX, e.clientY, dx, dy);
+      } else {
+        window.spawnMeteorShower(e.clientX, e.clientY, 0, 500);
+      }
+    }
+  }
+
+  function onCancel() {
+    if (!isDragging) return;
+    isDragging = false;
+    if (activeGadget === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
   }
 
   inventory.querySelectorAll('.gadget-slot').forEach(slot => {
-    slot.addEventListener('pointerdown', e => {
+    slot.addEventListener('click', e => {
       e.stopPropagation();
-      slot.classList.add('no-tooltip');
-      gadgetType = slot.dataset.gadget;
-
-      const r = slot.getBoundingClientRect();
-      slotCX = r.left + r.width  / 2;
-      slotCY = r.top  + r.height / 2;
-
-      if (gadgetType === 'blackhole') {
-        spawnGhost('blackhole', e.clientX, e.clientY);
-      } else if (gadgetType === 'spaceship') {
-        window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
-      } else if (gadgetType === 'comet') {
-        cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-        spawnGhost('comet', e.clientX, e.clientY);
-      } else if (gadgetType === 'meteor-shower') {
-        meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-        spawnGhost('meteor-shower', e.clientX, e.clientY);
-      }
-
-      slot.setPointerCapture(e.pointerId);
+      setActiveGadget(slot.dataset.gadget);
     });
+  });
 
-    slot.addEventListener('pointermove', e => {
-      if (gadgetType === 'blackhole' && ghost) {
-        ghost.style.left = e.clientX + 'px';
-        ghost.style.top  = e.clientY + 'px';
-      } else if (gadgetType === 'spaceship') {
-        window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
-      } else if (gadgetType === 'comet' && ghost) {
-        ghost.style.left = e.clientX + 'px';
-        ghost.style.top  = e.clientY + 'px';
-        cometDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-        if (cometDragHistory.length > 10) cometDragHistory.shift();
-        const n = cometDragHistory.length;
-        let angle;
-        if (n >= 2) {
-          const vdx = cometDragHistory[n - 1].x - cometDragHistory[0].x;
-          const vdy = cometDragHistory[n - 1].y - cometDragHistory[0].y;
-          angle = Math.hypot(vdx, vdy) > 4
-            ? Math.atan2(vdy, vdx) * 180 / Math.PI
-            : Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
-        } else {
-          angle = Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
-        }
-        ghost.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
-      } else if (gadgetType === 'meteor-shower' && ghost) {
-        ghost.style.left = e.clientX + 'px';
-        ghost.style.top  = e.clientY + 'px';
-        meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-        if (meteorDragHistory.length > 10) meteorDragHistory.shift();
-        const mn = meteorDragHistory.length;
-        let mAngle;
-        if (mn >= 2) {
-          const vdx = meteorDragHistory[mn - 1].x - meteorDragHistory[0].x;
-          const vdy = meteorDragHistory[mn - 1].y - meteorDragHistory[0].y;
-          mAngle = Math.hypot(vdx, vdy) > 4
-            ? Math.atan2(vdy, vdx) * 180 / Math.PI
-            : Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
-        } else {
-          mAngle = Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
-        }
-        ghost.style.transform = `translate(-50%, -50%) rotate(${mAngle + 90}deg)`;
-      }
-    });
-
-    slot.addEventListener('pointerup', e => {
-      const over        = document.elementFromPoint(e.clientX, e.clientY);
-      const onInventory = inventory.contains(over);
-
-      if (gadgetType === 'blackhole') {
-        if (ghost) { ghost.remove(); ghost = null; }
-        if (!onInventory && window.spawnBlackHole) {
-          window.spawnBlackHole(e.clientX, e.clientY);
-        }
-      } else if (gadgetType === 'spaceship') {
-        window.releaseSpaceship && window.releaseSpaceship();
-      } else if (gadgetType === 'comet') {
-        if (ghost) { ghost.remove(); ghost = null; }
-        if (!onInventory && window.spawnComet) {
-          const now    = performance.now();
-          const recent = cometDragHistory.filter(p => now - p.t < 100);
-          let vx = 0, vy = 0;
-          if (recent.length >= 2) {
-            const first = recent[0], last = recent[recent.length - 1];
-            const dtSec = (last.t - first.t) / 1000;
-            if (dtSec > 0.005) { vx = (last.x - first.x) / dtSec; vy = (last.y - first.y) / dtSec; }
-          }
-          if (Math.hypot(vx, vy) < 50) {
-            const dx   = e.clientX - slotCX, dy = e.clientY - slotCY;
-            const vlen = Math.hypot(dx, dy) || 1;
-            const spd  = Math.min(vlen * 3.5, 900);
-            vx = (dx / vlen) * spd; vy = (dy / vlen) * spd;
-          } else {
-            const spd = Math.hypot(vx, vy);
-            if (spd > 1200) { vx = vx / spd * 1200; vy = vy / spd * 1200; }
-          }
-          window.spawnComet(e.clientX, e.clientY, vx, vy);
-        }
-      } else if (gadgetType === 'meteor-shower') {
-        if (ghost) { ghost.remove(); ghost = null; }
-        if (!onInventory && window.spawnMeteorShower) {
-          const now    = performance.now();
-          const recent = meteorDragHistory.filter(p => now - p.t < 100);
-          let dx = 0, dy = 0;
-          if (recent.length >= 2) {
-            const first = recent[0], last = recent[recent.length - 1];
-            const dtSec = (last.t - first.t) / 1000;
-            if (dtSec > 0.005) { dx = (last.x - first.x) / dtSec; dy = (last.y - first.y) / dtSec; }
-          }
-          if (Math.hypot(dx, dy) < 50) {
-            dx = e.clientX - slotCX;
-            dy = e.clientY - slotCY;
-          }
-          if (Math.hypot(dx, dy) > 15) {
-            window.spawnMeteorShower(e.clientX, e.clientY, dx, dy);
-          }
-        }
-      }
-
-      gadgetType = null;
-      slot.classList.add('no-tooltip');
-    });
-
-    slot.addEventListener('pointercancel', () => cancelDrag(slot));
-
-    slot.addEventListener('pointerenter', () => {
-      if (!gadgetType) slot.classList.remove('no-tooltip');
-    });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && activeGadget) setActiveGadget(activeGadget);
   });
 })();
