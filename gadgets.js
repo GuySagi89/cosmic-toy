@@ -22,7 +22,8 @@
   let throwParticles    = [];
   let lastTrailTime     = null;
 
-  const SHIP_SVG = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
+  const SHIP_SVG     = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
+  const ASTEROID_SVG = '<svg class="gadget-cursor-asteroid-svg" viewBox="-20 -20 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-18 10,-13 17,-4 15,9 6,17 -7,16 -16,7 -15,-6 -8,-16" fill="rgba(0,28,32,0.85)" stroke="#00f5ff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="3" cy="-4" r="2.5" fill="rgba(0,245,255,0.12)" stroke="#00f5ff" stroke-width="0.8"/></svg>';
 
   function moveCursor(x, y) {
     if (!cursorEl) return;
@@ -204,6 +205,7 @@
       cursorEl = document.createElement('div');
       cursorEl.className = `gadget-cursor gadget-cursor--${activeGadget}`;
       if (activeGadget === 'spaceship') cursorEl.innerHTML = SHIP_SVG;
+      if (activeGadget === 'asteroid')  cursorEl.innerHTML = ASTEROID_SVG;
       if (activeGadget === 'meteor-shower') {
         const ring = document.createElement('div');
         ring.className = 'cooldown-ring';
@@ -271,6 +273,9 @@
 
     if (activeGadget === 'blackhole') {
       window.spawnBlackHole && window.spawnBlackHole(e.clientX, e.clientY);
+      isDragging = false;
+    } else if (activeGadget === 'asteroid') {
+      window.Asteroids && window.Asteroids.spawnAt(e.clientX, e.clientY);
       isDragging = false;
     } else if (activeGadget === 'spaceship') {
       if (e.pointerType === 'touch') {

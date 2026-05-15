@@ -224,6 +224,11 @@
         if (ship.hits >= 10) window.Spaceship.triggerExplosion();
         comets.splice(i, 1); continue;
       }
+
+      if (window.Asteroids && window.Asteroids.checkHit(c.x, c.y, 18, 1)) {
+        spawnExplosion(c.x, c.y);
+        comets.splice(i, 1); continue;
+      }
     }
   }
 

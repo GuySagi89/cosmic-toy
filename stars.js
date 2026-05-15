@@ -430,6 +430,9 @@
     updateSmoke(dt);
     drawSmoke();
 
+    window.Asteroids && window.Asteroids.update(dt);
+    window.Asteroids && window.Asteroids.draw(ctx);
+
     window.Spaceship && window.Spaceship.update(dt);
     window.Spaceship && window.Spaceship.draw(ctx);
 

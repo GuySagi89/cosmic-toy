@@ -291,6 +291,10 @@
           laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
           lhit = true;
         }
+        if (!lhit && window.Asteroids && window.Asteroids.checkHit(l.x, l.y, 6, 1)) {
+          laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
+          lhit = true;
+        }
         if (lhit || l.age > 3.5 ||
             l.x < -60 || l.x > canvas.width  + 60 ||
             l.y < -60 || l.y > canvas.height + 60) {

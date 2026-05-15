@@ -555,6 +555,73 @@ body {
   pointer-events: none;
 }
 
+/* ── Asteroid slot ── */
+#gadget-asteroid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 42% 38%, #001a20 0%, #000a12 62%);
+  box-shadow:
+    0 0 0 1px rgba(0, 245, 255, 0.36),
+    0 0 14px 4px rgba(0, 200, 255, 0.40),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+  transition: box-shadow 0.22s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #gadget-asteroid:hover {
+    box-shadow:
+      0 0 0 1px rgba(0, 245, 255, 0.68),
+      0 0 22px 7px rgba(0, 220, 255, 0.68),
+      inset 0 0 10px rgba(0, 0, 0, 0.92);
+  }
+}
+
+#gadget-asteroid.active {
+  box-shadow:
+    0 0 0 2px rgba(0, 245, 255, 0.95),
+    0 0 30px 12px rgba(0, 220, 255, 0.90),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+}
+
+.gadget-asteroid-icon {
+  width: calc(var(--slot-size) * 0.68);
+  height: calc(var(--slot-size) * 0.68);
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 4px rgba(0, 245, 255, 0.70))
+    drop-shadow(0 0 10px rgba(0, 200, 255, 0.40));
+  transition: filter 0.22s ease;
+}
+
+#gadget-asteroid.active .gadget-asteroid-icon {
+  filter:
+    drop-shadow(0 0 8px rgba(0, 245, 255, 0.95))
+    drop-shadow(0 0 18px rgba(0, 220, 255, 0.70));
+}
+
+/* ── Asteroid cursor ── */
+.gadget-cursor--asteroid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 42% 38%, #001a20 0%, #000a12 62%);
+  box-shadow:
+    0 0 0 1.5px rgba(0, 245, 255, 0.78),
+    0 0 14px 6px rgba(0, 200, 255, 0.65),
+    inset 0 0 8px rgba(0, 0, 0, 0.92);
+  overflow: hidden;
+}
+
+.gadget-cursor-asteroid-svg {
+  width: 68%;
+  height: 68%;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 4px rgba(0, 245, 255, 0.85))
+    drop-shadow(0 0 10px rgba(0, 200, 255, 0.50));
+}
+
 /* ── Drag origin dot ── */
 .gadget-origin-dot {
   position: fixed;
