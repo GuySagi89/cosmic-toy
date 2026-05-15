@@ -270,6 +270,7 @@
   function resize() {
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
+    window.gadgetScale = Math.min(window.innerWidth, window.innerHeight) < 600 ? 0.5 : 1;
     buildBackground();
     buildStars();
   }

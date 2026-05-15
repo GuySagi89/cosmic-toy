@@ -203,6 +203,38 @@
     }
 
     spawnExplosionDebris(spaceship.x, spaceship.y, spaceship.angle);
+
+    const BLAST_R = 280;
+    const ex = spaceship.x, ey = spaceship.y;
+
+    const globeEl = document.getElementById('globe-canvas');
+    if (globeEl) {
+      const gr   = globeEl.getBoundingClientRect();
+      const gcx  = gr.left + gr.width  / 2;
+      const gcy  = gr.top  + gr.height / 2;
+      const ddx  = gcx - ex, ddy = gcy - ey;
+      const dist = Math.hypot(ddx, ddy);
+      if (dist < BLAST_R) {
+        const strength = 1 - dist / BLAST_R;
+        const spd = 500 * strength;
+        window.dispatchEvent(new CustomEvent('comet-globe-impact', {
+          detail: { x: ex, y: ey, vx: (ddx / dist) * spd, vy: (ddy / dist) * spd, source: 'spaceship' }
+        }));
+      }
+    }
+
+    const moon = window.getMoonScreenPos && window.getMoonScreenPos();
+    if (moon) {
+      const ddx  = moon.x - ex, ddy = moon.y - ey;
+      const dist = Math.hypot(ddx, ddy);
+      if (dist < BLAST_R) {
+        const strength = 1 - dist / BLAST_R;
+        const spd = 500 * strength;
+        window.dispatchEvent(new CustomEvent('comet-moon-impact', {
+          detail: { x: moon.x, y: moon.y, vx: (ddx / dist) * spd, vy: (ddy / dist) * spd, source: 'spaceship' }
+        }));
+      }
+    }
   }
 
   function updateSpaceship(dt) {
@@ -506,8 +538,10 @@
     const stG  = cl(208, 140, hitFrac);
     const stB  = cl(255, 140, hitFrac);
 
+    const gs = window.gadgetScale || 1;
     ctx.globalAlpha = spaceship.alpha;
     ctx.translate(spaceship.x, spaceship.y);
+    ctx.scale(gs, gs);
 
     if (hits >= 7 && !spaceship.swirl) {
       const period   = 1000 / warnFreq;
@@ -576,9 +610,10 @@
     // Health bar — screen-aligned, below the ship
     if (!spaceship.exploding && !spaceship.swirl && spaceship.alpha > 0.05) {
       const health = Math.max(0, (10 - spaceship.hits) / 10);
-      const BAR_W  = 36, BAR_H = 4;
+      const gs2    = window.gadgetScale || 1;
+      const BAR_W  = 36 * gs2, BAR_H = 4 * gs2;
       const bx     = spaceship.x - BAR_W / 2;
-      const by     = spaceship.y + 22;
+      const by     = spaceship.y + 22 * gs2;
 
       ctx.save();
       ctx.globalAlpha = spaceship.alpha * 0.85;

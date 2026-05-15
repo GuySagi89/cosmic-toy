@@ -57,7 +57,7 @@
       y:  s.oy - s.dy * back + s.py * spread,
       vx: s.dx * sp + s.px * drift,
       vy: s.dy * sp + s.py * drift,
-      r:  2.2 + Math.random() * 1.4,
+      r:  (2.2 + Math.random() * 1.4) * (window.gadgetScale || 1),
       trail: [],
       age: 0,
     });
@@ -85,6 +85,7 @@
         if (dead.has(flat[i].m)) continue;
         for (let j = i - 1; j >= 0; j--) {
           if (dead.has(flat[j].m)) continue;
+          if (flat[i].s === flat[j].s) continue;
           const mi = flat[i].m, mj = flat[j].m;
           if (Math.hypot(mi.x - mj.x, mi.y - mj.y) < 12) {
             spawnImpact(mi.x, mi.y, mi.vx, mi.vy);
@@ -189,8 +190,8 @@
         }
 
         if (hit || m.age > 4.5 ||
-            m.x < -160 || m.x > canvas.width  + 160 ||
-            m.y < -160 || m.y > canvas.height + 160) {
+            m.x < -500 || m.x > canvas.width  + 500 ||
+            m.y < -500 || m.y > canvas.height + 500) {
           s.meteors.splice(mi, 1);
         }
       }
@@ -234,8 +235,9 @@
   }
 
   function drawImpact(imp) {
+    const gs   = window.gadgetScale || 1;
     const frac = imp.age / imp.maxAge;
-    const r    = frac * 22;
+    const r    = frac * 22 * gs;
 
     // Inner flash — only in the first third
     if (frac < 0.35) {

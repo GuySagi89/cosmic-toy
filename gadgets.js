@@ -106,12 +106,14 @@
       lastTrailTime = null;
       return;
     }
-    const last = dragPath[dragPath.length - 1];
-    let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
-    for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
-    pathEl.setAttribute('d', d);
-    gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
-    gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
+    if (activeGadget !== 'comet') {
+      const last = dragPath[dragPath.length - 1];
+      let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
+      for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
+      pathEl.setAttribute('d', d);
+      gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
+      gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
+    }
     trailRafId = requestAnimationFrame(animateTrail);
   }
 
@@ -149,6 +151,25 @@
     if (Math.hypot(dx, dy) > 4) {
       const angle = Math.atan2(dy, dx) * 180 / Math.PI;
       cursorEl.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
+    }
+    if (activeGadget === 'comet' && window.smokeParticles && window.smokeParticles.length < 600) {
+      const len = Math.hypot(dx, dy) || 1;
+      const bx  = -dx / len, by = -dy / len;
+      for (let j = 0; j < 8; j++) {
+        const spread = (Math.random() - 0.5) * 1.1;
+        const cs = Math.cos(spread), ss = Math.sin(spread);
+        window.smokeParticles.push({
+          x: cx + (Math.random() - 0.5) * 6,
+          y: cy + (Math.random() - 0.5) * 6,
+          vx: (bx * cs - by * ss) * (25 + Math.random() * 45),
+          vy: (bx * ss + by * cs) * (25 + Math.random() * 45),
+          life: 0.35 + Math.random() * 0.3,
+          maxLife: 0.55,
+          r: 2.5 + Math.random() * 3.5,
+          core: Math.random() < 0.4,
+          comet: true,
+        });
+      }
     }
   }
 
@@ -213,7 +234,8 @@
     moveCursor(e.clientX, e.clientY);
     if (e.pointerType !== 'mouse') return; // touch cursor visibility is managed by down/up
     const over = document.elementFromPoint(e.clientX, e.clientY);
-    cursorEl.style.opacity = (over && inventory.contains(over)) ? '0' : '1';
+    cursorEl.style.opacity = (over && inventory.contains(over)) ? '0'
+      : cursorEl.classList.contains('on-cooldown') ? '0.52' : '1';
   }, { capture: true });
 
   function onDown(e) {

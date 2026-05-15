@@ -15,7 +15,7 @@
       }
       dyingBlackHoles.push(blackHole);
     }
-    blackHole = { x, y, baseRadius: 28, age: 0, maxAge: 5.5, rotation: 0, explodeFired: false };
+    blackHole = { x, y, baseRadius: 28 * (window.gadgetScale || 1), age: 0, maxAge: 5.5, rotation: 0, explodeFired: false };
   }
 
   function lensedPos(sx, sy, bh) {

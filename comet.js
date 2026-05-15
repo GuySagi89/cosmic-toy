@@ -62,12 +62,12 @@
     explosions.push({ x, y, age: 0, maxAge: 0.65 });
   }
 
-  function drawExplosion(exp) {
+  function drawExplosion(exp, gs = 1) {
     const frac = exp.age / exp.maxAge;
 
     if (frac < 0.5) {
       const f2 = frac / 0.5;
-      const r  = (1 - f2) * 45 + 6;
+      const r  = ((1 - f2) * 45 + 6) * gs;
       const fg = ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, r);
       fg.addColorStop(0,    `rgba(255,255,255,${(1 - f2) * 0.92})`);
       fg.addColorStop(0.35, `rgba(180,245,255,${(1 - f2) * 0.65})`);
@@ -81,11 +81,11 @@
     ctx.save();
     ctx.globalAlpha = Math.max(0, (1 - frac) * 0.90);
     ctx.strokeStyle = frac < 0.45 ? 'rgba(210,248,255,1)' : 'rgba(80,185,255,0.85)';
-    ctx.lineWidth   = (1 - frac) * 3.5 + 0.4;
+    ctx.lineWidth   = ((1 - frac) * 3.5 + 0.4) * gs;
     ctx.shadowColor = 'rgba(100,220,255,0.7)';
-    ctx.shadowBlur  = 18 * (1 - frac);
+    ctx.shadowBlur  = 18 * (1 - frac) * gs;
     ctx.beginPath();
-    ctx.arc(exp.x, exp.y, Math.max(0.5, frac * 85), 0, Math.PI * 2);
+    ctx.arc(exp.x, exp.y, Math.max(0.5, frac * 85 * gs), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
 
@@ -94,9 +94,9 @@
       ctx.save();
       ctx.globalAlpha = Math.max(0, (1 - f2) * 0.55);
       ctx.strokeStyle = 'rgba(160,235,255,0.9)';
-      ctx.lineWidth   = (1 - f2) * 2 + 0.3;
+      ctx.lineWidth   = ((1 - f2) * 2 + 0.3) * gs;
       ctx.beginPath();
-      ctx.arc(exp.x, exp.y, Math.max(0.5, f2 * 55), 0, Math.PI * 2);
+      ctx.arc(exp.x, exp.y, Math.max(0.5, f2 * 55 * gs), 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -228,17 +228,18 @@
   }
 
   function drawComet() {
-    for (const exp of explosions) drawExplosion(exp);
+    const gs = window.gadgetScale || 1;
+    for (const exp of explosions) drawExplosion(exp, gs);
     for (const c of comets) {
       if (c.swirl) {
         const frac  = c.swirl.age / c.swirl.maxAge;
         const scale = Math.max(0, 1 - Math.pow(frac, 0.55));
         if (scale < 0.02) continue;
-        const r = Math.max(0.1, 28 * scale);
+        const r = Math.max(0.1, 28 * gs * scale);
         ctx.save();
         ctx.globalAlpha = scale;
         ctx.shadowColor = 'rgba(160, 240, 255, 1)';
-        ctx.shadowBlur  = 50 * scale;
+        ctx.shadowBlur  = 50 * gs * scale;
         const cg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
         cg.addColorStop(0,   'rgba(255, 255, 255, 1)');
         cg.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
@@ -256,7 +257,7 @@
       const nx = c.vx / spd, ny = c.vy / spd;
 
       ctx.save();
-      const tailLen = Math.min(200, spd * 0.28);
+      const tailLen = Math.min(200, spd * 0.28) * gs;
       const tx = c.x - nx * tailLen, ty = c.y - ny * tailLen;
 
       const tailGrad = ctx.createLinearGradient(c.x, c.y, tx, ty);
@@ -264,7 +265,7 @@
       tailGrad.addColorStop(0.3, 'rgba(100, 220, 255, 0.60)');
       tailGrad.addColorStop(1,   'rgba(60, 140, 255, 0)');
       ctx.strokeStyle = tailGrad;
-      ctx.lineWidth   = 10;
+      ctx.lineWidth   = 10 * gs;
       ctx.lineCap     = 'round';
       ctx.beginPath();
       ctx.moveTo(c.x, c.y);
@@ -272,14 +273,14 @@
       ctx.stroke();
 
       ctx.shadowColor = 'rgba(160, 240, 255, 1)';
-      ctx.shadowBlur  = 50;
-      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 26);
+      ctx.shadowBlur  = 50 * gs;
+      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 26 * gs);
       coreGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
       coreGrad.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
       coreGrad.addColorStop(1,   'rgba(60, 160, 255, 0)');
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
-      ctx.arc(c.x, c.y, 26, 0, Math.PI * 2);
+      ctx.arc(c.x, c.y, 26 * gs, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
