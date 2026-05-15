@@ -102,12 +102,12 @@
     }
   }
 
-  function spawnComet(x, y, vx, vy, omega) {
+  function spawnComet(x, y, vx, vy) {
     const MAX_SPD = 320;
     const s = Math.hypot(vx, vy);
     if (s > MAX_SPD) { vx = vx / s * MAX_SPD; vy = vy / s * MAX_SPD; }
     if (comets.length >= 5) blastComet(comets.shift(), x, y);
-    comets.push({ x, y, vx, vy, hp: 3, omega: omega || 0 });
+    comets.push({ x, y, vx, vy, hp: 3 });
   }
 
   function updateComet(dt) {
@@ -170,16 +170,6 @@
         }
       }
       if (c.swirl) continue;
-
-      if (c.omega) {
-        const a = c.omega * dt;
-        const cos = Math.cos(a), sin = Math.sin(a);
-        const nvx = c.vx * cos - c.vy * sin;
-        const nvy = c.vx * sin + c.vy * cos;
-        c.vx = nvx; c.vy = nvy;
-        c.omega *= Math.max(0, 1 - 1.8 * dt);
-        if (Math.abs(c.omega) < 0.04) c.omega = 0;
-      }
 
       c.x += c.vx * dt;
       c.y += c.vy * dt;

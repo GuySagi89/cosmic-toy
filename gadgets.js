@@ -18,7 +18,6 @@
   let meteorDragHistory = [];
   let throwParticles    = [];
   let lastTrailTime     = null;
-  let trailReleaseTime  = null;
 
   const SHIP_SVG = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
 
@@ -28,8 +27,7 @@
     cursorEl.style.top  = y + 'px';
   }
 
-  const TRAIL_MS       = 200;
-  const TRAIL_FADE_MS  =  2;
+  const TRAIL_MS = 1100;
 
   function showDragOrigin(x, y, type) {
     // Cancel any previous trail before starting fresh
@@ -97,29 +95,6 @@
       p.el.setAttribute('opacity', (1 - p.age / p.maxAge) * 0.85);
     }
 
-    // After release: fade trail out quickly, then clean up when particles also finish
-    if (!isDragging && trailReleaseTime !== null) {
-      const alpha = Math.max(0, 1 - (now - trailReleaseTime) / TRAIL_FADE_MS);
-      pathEl.setAttribute('opacity', alpha);
-      if (alpha > 0 && dragPath.length >= 2) {
-        const last = dragPath[dragPath.length - 1];
-        let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
-        for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
-        pathEl.setAttribute('d', d);
-        gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
-        gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
-      }
-      if (alpha <= 0) dragPath = [];
-      if (throwParticles.length > 0 || alpha > 0) {
-        trailRafId = requestAnimationFrame(animateTrail);
-        return;
-      }
-      svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; dragPath = [];
-      lastTrailTime = null; trailReleaseTime = null;
-      return;
-    }
-
-    // While dragging: normal scrolling window
     const cutoff = now - TRAIL_MS;
     while (dragPath.length > 1 && dragPath[0].t < cutoff) dragPath.shift();
     if (dragPath.length < 2) {
@@ -175,32 +150,6 @@
       const angle = Math.atan2(dy, dx) * 180 / Math.PI;
       cursorEl.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
     }
-  }
-
-  // Returns signed geometric curvature (rad/px) at the tip of the gesture path.
-  // Uses the last 8 points only (end-weighted average) so earlier straight portions
-  // of the gesture don't dilute the curve the user actually drew at release.
-  function computePathKappa(history) {
-    if (history.length < 3) return 0;
-    const tail = history.slice(Math.max(0, history.length - 8));
-    if (tail.length < 3) return 0;
-    let kappa = 0, weight = 0;
-    for (let i = 2; i < tail.length; i++) {
-      const a = tail[i - 2], b = tail[i - 1], c = tail[i];
-      const dx1 = b.x - a.x, dy1 = b.y - a.y;
-      const dx2 = c.x - b.x, dy2 = c.y - b.y;
-      const len1 = Math.hypot(dx1, dy1);
-      const len2 = Math.hypot(dx2, dy2);
-      if (len1 < 1 || len2 < 1) continue;
-      let dA = Math.atan2(dy2, dx2) - Math.atan2(dy1, dx1);
-      if (dA >  Math.PI) dA -= 2 * Math.PI;
-      if (dA < -Math.PI) dA += 2 * Math.PI;
-      const w = (i - 1) / (tail.length - 1); // later segments weighted more
-      kappa  += (dA / (len1 + len2)) * w;
-      weight += w;
-    }
-    if (weight < 0.01) return 0;
-    return Math.max(-0.02, Math.min(0.02, kappa / weight));
   }
 
   function hideDragFeedback() {
@@ -303,11 +252,11 @@
       window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
     } else if (activeGadget === 'comet') {
       cometDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-      if (cometDragHistory.length > 40) cometDragHistory.shift();
+      if (cometDragHistory.length > 10) cometDragHistory.shift();
       updateDragFeedback(e.clientX, e.clientY);
     } else if (activeGadget === 'meteor-shower') {
       meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-      if (meteorDragHistory.length > 40) meteorDragHistory.shift();
+      if (meteorDragHistory.length > 10) meteorDragHistory.shift();
       updateDragFeedback(e.clientX, e.clientY);
     }
   }
@@ -348,10 +297,7 @@
         const spd = Math.hypot(vx, vy);
         if (spd > 1200) { vx = vx / spd * 1200; vy = vy / spd * 1200; }
       }
-      const kappa = computePathKappa(cometDragHistory);
-      const launchSpd = Math.min(Math.hypot(vx, vy), 320);
-      const omega = Math.max(-5, Math.min(5, kappa * launchSpd));
-      window.spawnComet(e.clientX, e.clientY, vx, vy, omega);
+      window.spawnComet(e.clientX, e.clientY, vx, vy);
       spawnThrowParticles(e.clientX, e.clientY, 'comet');
     } else if (activeGadget === 'meteor-shower' && window.spawnMeteorShower) {
       const now    = performance.now();
@@ -366,12 +312,10 @@
         dx = e.clientX - dragStartX;
         dy = e.clientY - dragStartY;
       }
-      const kappa = computePathKappa(meteorDragHistory);
-      const omega = Math.max(-2.5, Math.min(2.5, kappa * 350));
       if (Math.hypot(dx, dy) > 15) {
-        window.spawnMeteorShower(e.clientX, e.clientY, dx, dy, omega);
+        window.spawnMeteorShower(e.clientX, e.clientY, dx, dy);
       } else {
-        window.spawnMeteorShower(e.clientX, e.clientY, 0, 500, omega);
+        window.spawnMeteorShower(e.clientX, e.clientY, 0, 500);
       }
       spawnThrowParticles(e.clientX, e.clientY, 'meteor-shower');
     }

@@ -30,7 +30,7 @@
     }
   }
 
-  function launch(sx, sy, dirX, dirY, omega) {
+  function launch(sx, sy, dirX, dirY) {
     if (cooldown > 0) return;
     const len = Math.hypot(dirX, dirY);
     if (len < 8) return;
@@ -42,7 +42,6 @@
       elapsed: 0,
       spawned: 0,
       meteors: [],
-      omega: omega || 0,
     });
     cooldown = COOLDOWN_MAX;
     updateCooldownUI();
@@ -140,14 +139,6 @@
         }
         if (m.swirl) continue;
 
-        if (s.omega) {
-          const a = s.omega * dt;
-          const cos = Math.cos(a), sin = Math.sin(a);
-          const nvx = m.vx * cos - m.vy * sin;
-          const nvy = m.vx * sin + m.vy * cos;
-          m.vx = nvx; m.vy = nvy;
-        }
-
         m.trail.unshift({ x: m.x, y: m.y });
         if (m.trail.length > 8) m.trail.pop();
 
@@ -202,11 +193,6 @@
             m.y < -160 || m.y > canvas.height + 160) {
           s.meteors.splice(mi, 1);
         }
-      }
-
-      if (s.omega) {
-        s.omega *= Math.max(0, 1 - 1.6 * dt);
-        if (Math.abs(s.omega) < 0.04) s.omega = 0;
       }
 
       if (s.spawned >= COUNT && s.meteors.length === 0) showers.splice(si, 1);
