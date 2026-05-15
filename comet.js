@@ -166,7 +166,7 @@
 
       const ship = window.Spaceship && window.Spaceship.get();
       if (ship && !ship.exploding && Math.hypot(c.x - ship.x, c.y - ship.y) < 22) {
-        ship.hits += 3;
+        ship.hits += 5;
         spawnImpactDebris(c.x, c.y, c.vx, c.vy);
         if (ship.hits >= 10) window.Spaceship.triggerExplosion();
         comets.splice(i, 1); continue;
