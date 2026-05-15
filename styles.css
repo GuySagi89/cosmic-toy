@@ -15,6 +15,9 @@ html {
   --primary:    #818cf8;
   --border:     #1e1e3f;
   --shadow:     0 1px 6px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+  /* Gadget sizing — scales with viewport like the globe */
+  --slot-size:  clamp(38px, 10.5vmin, 52px);
+  --slot-gap:   clamp(8px, 2.2vmin, 12px);
 }
 
 /* ── Star field canvas ── */
@@ -73,8 +76,8 @@ body {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: var(--slot-gap);
+  padding: clamp(7px, 1.8vmin, 10px) clamp(10px, 2.6vmin, 14px);
   background: rgba(7, 4, 26, 0.84);
   border: 1px solid rgba(130, 100, 255, 0.32);
   border-radius: 20px;
@@ -87,21 +90,26 @@ body {
 
 /* Desktop: vertical bar pinned to bottom-right */
 @media (min-width: 600px) and (min-height: 600px) {
+  :root {
+    --slot-size: clamp(44px, 5vmin, 58px);
+    --slot-gap:  clamp(10px, 1.2vmin, 14px);
+  }
+
   #gadget-inventory {
     left: auto;
     right: 24px;
     bottom: 24px;
     transform: none;
     flex-direction: column;
-    padding: 10px 8px;
+    padding: clamp(9px, 1.1vmin, 12px) clamp(7px, 0.85vmin, 10px);
     border-radius: 18px;
   }
 }
 
 .gadget-slot {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: var(--slot-size);
+  height: var(--slot-size);
   border-radius: 50%;
   cursor: grab;
   touch-action: none;
@@ -144,8 +152,8 @@ body {
 }
 
 .gadget-ship-icon {
-  width: 26px;
-  height: 26px;
+  width: calc(var(--slot-size) * 0.65);
+  height: calc(var(--slot-size) * 0.65);
   pointer-events: none;
   filter: drop-shadow(0 0 3px rgba(180, 150, 255, 0.55));
   transition: filter 0.22s ease;
@@ -247,7 +255,7 @@ body {
   content: '';
   position: absolute;
   top: 22%; left: 68%;
-  width: 8px; height: 8px;
+  width: calc(var(--slot-size) * 0.20); height: calc(var(--slot-size) * 0.20);
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 0 6px 3px rgba(160, 230, 255, 0.8);
@@ -293,31 +301,31 @@ body {
   transform-origin: top left;
   pointer-events: none;
   box-shadow:
-    12px 3px 0 0 rgba(255,220,125,0.80),
-    24px 7px 0 0 rgba(255,195, 85,0.55);
+    calc(var(--slot-size) * 0.30) calc(var(--slot-size) * 0.075) 0 0 rgba(255,220,125,0.80),
+    calc(var(--slot-size) * 0.60) calc(var(--slot-size) * 0.175) 0 0 rgba(255,195, 85,0.55);
 }
 /* Three meteor heads with glow */
 #gadget-meteor-shower::after {
   content: '';
   position: absolute;
   top: 9%; left: 12%;
-  width: 5px; height: 5px;
+  width: calc(var(--slot-size) * 0.125); height: calc(var(--slot-size) * 0.125);
   border-radius: 50%;
   background: rgba(255,255,215,0.97);
   box-shadow:
-    0 0 5px 2px rgba(255,215,80,0.82),
-    12px 3px 0 0 rgba(255,250,200,0.90),
-    12px 3px 0 3px rgba(255,205,75,0.55),
-    24px 7px 0 -1px rgba(255,240,170,0.75),
-    24px 7px 0 2px rgba(255,180,52,0.42);
+    0 0 calc(var(--slot-size) * 0.125) calc(var(--slot-size) * 0.05) rgba(255,215,80,0.82),
+    calc(var(--slot-size) * 0.30) calc(var(--slot-size) * 0.075) 0 0 rgba(255,250,200,0.90),
+    calc(var(--slot-size) * 0.30) calc(var(--slot-size) * 0.075) 0 calc(var(--slot-size) * 0.075) rgba(255,205,75,0.55),
+    calc(var(--slot-size) * 0.60) calc(var(--slot-size) * 0.175) 0 calc(var(--slot-size) * -0.025) rgba(255,240,170,0.75),
+    calc(var(--slot-size) * 0.60) calc(var(--slot-size) * 0.175) 0 calc(var(--slot-size) * 0.05) rgba(255,180,52,0.42);
   pointer-events: none;
 }
 
 /* ── Drag ghost ── */
 .gadget-drag-ghost {
   position: fixed;
-  width: 44px;
-  height: 44px;
+  width: calc(var(--slot-size) + 4px);
+  height: calc(var(--slot-size) + 4px);
   border-radius: 50%;
   pointer-events: none;
   z-index: 9999;
@@ -334,15 +342,15 @@ body {
 }
 
 .gadget-drag-ghost[data-gadget="comet"] {
-  width: 36px;
-  height: 36px;
+  width: calc(var(--slot-size) - 4px);
+  height: calc(var(--slot-size) - 4px);
   background: radial-gradient(circle at 50% 30%, #ffffff 0%, rgba(120, 200, 255, 0.6) 35%, transparent 70%);
   box-shadow: 0 0 10px 4px rgba(120, 220, 255, 0.55);
 }
 
 .gadget-drag-ghost[data-gadget="meteor-shower"] {
-  width: 38px;
-  height: 38px;
+  width: calc(var(--slot-size) - 2px);
+  height: calc(var(--slot-size) - 2px);
   background: radial-gradient(circle at 50% 35%, rgba(255,210,100,0.88) 0%, rgba(255,110,25,0.32) 42%, transparent 70%);
   box-shadow: 0 0 12px 5px rgba(255,140,38,0.50);
 }
