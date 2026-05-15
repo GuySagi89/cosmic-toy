@@ -388,7 +388,7 @@
       const easeOut = t => 1 - Math.pow(1 - t, 3);
 
       // White-hot core flash with fire-to-purple gradient
-      const flashPeak = Math.sin(prog * Math.PI * 0.7) * (1 - prog * 0.5);
+      const flashPeak = Math.sin(prog * Math.PI) * (1 - prog);
       if (flashPeak > 0.01) {
         const flash = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 220);
         flash.addColorStop(0,    `rgba(255, 255, 255,  ${flashPeak * 0.99})`);

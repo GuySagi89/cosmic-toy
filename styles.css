@@ -202,7 +202,7 @@ body {
   z-index: 101;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .gadget-slot:hover .gadget-tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -308,7 +308,33 @@ body {
     0 0 14px 4px rgba(195, 78, 18, 0.38),
     inset 0 0 10px rgba(0, 0, 0, 0.92);
   position: relative;
-  transition: box-shadow 0.22s ease;
+  transition: box-shadow 0.22s ease, opacity 0.25s ease;
+}
+
+#gadget-meteor-shower.on-cooldown {
+  opacity: 0.52;
+}
+
+.cooldown-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    rgba(255, 185, 65, 0.95) var(--cd-pct, 0%),
+    rgba(28,  8,  0, 0.60)   var(--cd-pct, 0%)
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #fff calc(100% - 3px));
+  mask:          radial-gradient(farthest-side, transparent calc(100% - 3px), #fff calc(100% - 3px));
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#gadget-meteor-shower.on-cooldown .cooldown-ring,
+.gadget-cursor--meteor-shower.on-cooldown .cooldown-ring {
+  opacity: 1;
 }
 #gadget-meteor-shower:hover {
   box-shadow:

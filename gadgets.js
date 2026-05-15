@@ -9,6 +9,7 @@
   let svgEl             = null;
   let pathEl            = null;
   let gradEl            = null;
+  let trailRafId        = null;
   let dragPath          = [];
   let isDragging        = false;
   let dragStartX        = 0;
@@ -27,10 +28,14 @@
   const TRAIL_MS = 1100;
 
   function showDragOrigin(x, y, type) {
+    // Cancel any previous trail before starting fresh
+    if (trailRafId !== null) { cancelAnimationFrame(trailRafId); trailRafId = null; }
+    if (svgEl) { svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; }
+
     dragPath = [{ x, y, t: performance.now() }];
 
-    const NS    = 'http://www.w3.org/2000/svg';
-    const color = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
+    const NS     = 'http://www.w3.org/2000/svg';
+    const color  = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
     const gradId = `drag-trail-${type}`;
 
     svgEl = document.createElementNS(NS, 'svg');
@@ -66,24 +71,31 @@
     svgEl.appendChild(pathEl);
 
     document.body.appendChild(svgEl);
-    requestAnimationFrame(animateTrail);
+    trailRafId = requestAnimationFrame(animateTrail);
   }
 
   function animateTrail() {
+    trailRafId = null;
     if (!svgEl || !pathEl) return;
     const cutoff = performance.now() - TRAIL_MS;
     while (dragPath.length > 1 && dragPath[0].t < cutoff) dragPath.shift();
-    if (dragPath.length >= 2) {
-      const last = dragPath[dragPath.length - 1];
-      let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
-      for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
-      pathEl.setAttribute('d', d);
-      gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
-      gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
-    } else {
-      pathEl.setAttribute('d', '');
+    if (dragPath.length < 2) {
+      if (isDragging) {
+        // Still in the drag but no path yet — keep the loop alive
+        trailRafId = requestAnimationFrame(animateTrail);
+        return;
+      }
+      // Post-release: trail fully aged out — clean up
+      svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; dragPath = [];
+      return;
     }
-    requestAnimationFrame(animateTrail);
+    const last = dragPath[dragPath.length - 1];
+    let d = `M ${dragPath[0].x} ${dragPath[0].y}`;
+    for (let i = 1; i < dragPath.length; i++) d += ` L ${dragPath[i].x} ${dragPath[i].y}`;
+    pathEl.setAttribute('d', d);
+    gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
+    gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
+    trailRafId = requestAnimationFrame(animateTrail);
   }
 
   function updateDragFeedback(cx, cy) {
@@ -100,6 +112,7 @@
   }
 
   function hideDragFeedback() {
+    if (trailRafId !== null) { cancelAnimationFrame(trailRafId); trailRafId = null; }
     if (svgEl) { svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; }
     dragPath = [];
     if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
@@ -126,6 +139,11 @@
       cursorEl = document.createElement('div');
       cursorEl.className = `gadget-cursor gadget-cursor--${activeGadget}`;
       if (activeGadget === 'spaceship') cursorEl.innerHTML = SHIP_SVG;
+      if (activeGadget === 'meteor-shower') {
+        const ring = document.createElement('div');
+        ring.className = 'cooldown-ring';
+        cursorEl.appendChild(ring);
+      }
       cursorEl.style.left = '-100px';
       cursorEl.style.top  = '-100px';
       document.body.appendChild(cursorEl);
@@ -175,6 +193,7 @@
       showDragOrigin(dragStartX, dragStartY, 'comet');
       overlay.setPointerCapture(e.pointerId);
     } else if (activeGadget === 'meteor-shower') {
+      if (window.MeteorShower && !window.MeteorShower.isReady()) { isDragging = false; return; }
       meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
       showDragOrigin(dragStartX, dragStartY, 'meteor-shower');
       overlay.setPointerCapture(e.pointerId);
@@ -202,7 +221,12 @@
     if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     if (!isDragging) return;
     isDragging = false;
-    hideDragFeedback();
+    // Trail gadgets: let animateTrail age the path out naturally; others: clean up now
+    if (activeGadget === 'comet' || activeGadget === 'meteor-shower') {
+      if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
+    } else {
+      hideDragFeedback();
+    }
 
     if (activeGadget === 'spaceship') {
       if (cursorEl) cursorEl.classList.remove('pressing');

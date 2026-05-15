@@ -9,22 +9,42 @@
   const SPEED_VARIANCE = 220;
   const SPREAD         = 130;   // perpendicular spread (total)
   const BACK_OFFSET    = 360;   // how far behind release to start spawning
+  const COOLDOWN_MAX   = 3.0;   // seconds between launches
 
-  let showers = [];
-  let impacts = [];
+  let showers  = [];
+  let impacts  = [];
+  let cooldown = 0;
+
+  function updateCooldownUI() {
+    const pct = cooldown > 0
+      ? `${((1 - cooldown / COOLDOWN_MAX) * 100).toFixed(1)}%`
+      : '0%';
+    const active = cooldown > 0;
+    for (const el of [
+      document.getElementById('gadget-meteor-shower'),
+      document.querySelector('.gadget-cursor--meteor-shower'),
+    ]) {
+      if (!el) continue;
+      el.style.setProperty('--cd-pct', pct);
+      el.classList.toggle('on-cooldown', active);
+    }
+  }
 
   function launch(sx, sy, dirX, dirY) {
+    if (cooldown > 0) return;
     const len = Math.hypot(dirX, dirY);
     if (len < 8) return;
     const dx = dirX / len, dy = dirY / len;
     showers.push({
       dx, dy,
-      px: -dy, py: dx,    // perpendicular unit vector
-      ox: sx,  oy: sy,    // release point (shower target)
+      px: -dy, py: dx,
+      ox: sx,  oy: sy,
       elapsed: 0,
       spawned: 0,
       meteors: [],
     });
+    cooldown = COOLDOWN_MAX;
+    updateCooldownUI();
   }
 
   function spawnOne(s) {
@@ -44,6 +64,11 @@
   }
 
   function update(dt) {
+    if (cooldown > 0) {
+      cooldown = Math.max(0, cooldown - dt);
+      updateCooldownUI();
+    }
+
     const allBHs  = window.BlackHole ? window.BlackHole.getAll() : [];
     const globeEl = document.getElementById('globe-canvas');
     const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
@@ -296,6 +321,7 @@
   window.spawnMeteorShower = launch;
   window.MeteorShower = {
     update, draw,
+    isReady: () => cooldown <= 0,
     blastInRadius(cx, cy, r) {
       for (let si = showers.length - 1; si >= 0; si--) {
         const s = showers[si];
