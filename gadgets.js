@@ -16,6 +16,8 @@
   let dragStartY        = 0;
   let cometDragHistory  = [];
   let meteorDragHistory = [];
+  let throwParticles    = [];
+  let lastTrailTime     = null;
 
   const SHIP_SVG = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
 
@@ -77,16 +79,31 @@
   function animateTrail() {
     trailRafId = null;
     if (!svgEl || !pathEl) return;
-    const cutoff = performance.now() - TRAIL_MS;
+
+    const now = performance.now();
+    const dt  = lastTrailTime !== null ? (now - lastTrailTime) / 1000 : 0;
+    lastTrailTime = now;
+
+    for (let i = throwParticles.length - 1; i >= 0; i--) {
+      const p = throwParticles[i];
+      p.age += dt;
+      if (p.age >= p.maxAge) { p.el.remove(); throwParticles.splice(i, 1); continue; }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.el.setAttribute('cx', p.x);
+      p.el.setAttribute('cy', p.y);
+      p.el.setAttribute('opacity', (1 - p.age / p.maxAge) * 0.85);
+    }
+
+    const cutoff = now - TRAIL_MS;
     while (dragPath.length > 1 && dragPath[0].t < cutoff) dragPath.shift();
     if (dragPath.length < 2) {
-      if (isDragging) {
-        // Still in the drag but no path yet — keep the loop alive
+      if (isDragging || throwParticles.length > 0) {
         trailRafId = requestAnimationFrame(animateTrail);
         return;
       }
-      // Post-release: trail fully aged out — clean up
       svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; dragPath = [];
+      lastTrailTime = null;
       return;
     }
     const last = dragPath[dragPath.length - 1];
@@ -96,6 +113,30 @@
     gradEl.setAttribute('x1', dragPath[0].x); gradEl.setAttribute('y1', dragPath[0].y);
     gradEl.setAttribute('x2', last.x);        gradEl.setAttribute('y2', last.y);
     trailRafId = requestAnimationFrame(animateTrail);
+  }
+
+  function spawnThrowParticles(x, y, type) {
+    if (!svgEl) return;
+    const NS    = 'http://www.w3.org/2000/svg';
+    const color = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
+    const count = 7;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.6;
+      const spd   = 55 + Math.random() * 75;
+      const el    = document.createElementNS(NS, 'circle');
+      el.setAttribute('r',    1.4 + Math.random() * 1.6);
+      el.setAttribute('fill', color);
+      el.setAttribute('cx',   x);
+      el.setAttribute('cy',   y);
+      svgEl.appendChild(el);
+      throwParticles.push({
+        el, x, y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        age: 0,
+        maxAge: 0.22 + Math.random() * 0.18,
+      });
+    }
   }
 
   function updateDragFeedback(cx, cy) {
@@ -115,6 +156,9 @@
     if (trailRafId !== null) { cancelAnimationFrame(trailRafId); trailRafId = null; }
     if (svgEl) { svgEl.remove(); svgEl = null; pathEl = null; gradEl = null; }
     dragPath = [];
+    throwParticles.forEach(p => p.el && p.el.remove());
+    throwParticles = [];
+    lastTrailTime  = null;
     if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
   }
 
@@ -254,6 +298,7 @@
         if (spd > 1200) { vx = vx / spd * 1200; vy = vy / spd * 1200; }
       }
       window.spawnComet(e.clientX, e.clientY, vx, vy);
+      spawnThrowParticles(e.clientX, e.clientY, 'comet');
     } else if (activeGadget === 'meteor-shower' && window.spawnMeteorShower) {
       const now    = performance.now();
       const recent = meteorDragHistory.filter(p => now - p.t < 100);
@@ -272,6 +317,7 @@
       } else {
         window.spawnMeteorShower(e.clientX, e.clientY, 0, 500);
       }
+      spawnThrowParticles(e.clientX, e.clientY, 'meteor-shower');
     }
   }
 

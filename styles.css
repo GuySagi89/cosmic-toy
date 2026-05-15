@@ -119,11 +119,13 @@ body {
   transition: box-shadow 0.22s ease;
 }
 
-#gadget-blackhole:hover {
-  box-shadow:
-    0 0 0 1px rgba(210, 180, 255, 0.60),
-    0 0 22px 7px rgba(180, 110, 255, 0.72),
-    inset 0 0 10px rgba(0, 0, 0, 0.95);
+@media (hover: hover) and (pointer: fine) {
+  #gadget-blackhole:hover {
+    box-shadow:
+      0 0 0 1px rgba(210, 180, 255, 0.60),
+      0 0 22px 7px rgba(180, 110, 255, 0.72),
+      inset 0 0 10px rgba(0, 0, 0, 0.95);
+  }
 }
 
 #gadget-blackhole.active {
@@ -144,10 +146,12 @@ body {
   transition: box-shadow 0.22s ease;
 }
 
-#gadget-spaceship:hover {
-  box-shadow:
-    0 0 0 1px rgba(180, 150, 255, 0.52),
-    0 0 18px 5px rgba(150, 100, 242, 0.46);
+@media (hover: hover) and (pointer: fine) {
+  #gadget-spaceship:hover {
+    box-shadow:
+      0 0 0 1px rgba(180, 150, 255, 0.52),
+      0 0 18px 5px rgba(150, 100, 242, 0.46);
+  }
 }
 
 #gadget-spaceship.active {
@@ -173,8 +177,10 @@ body {
   transition: filter 0.22s ease;
 }
 
-#gadget-spaceship:hover .gadget-ship-icon {
-  filter: drop-shadow(0 0 6px rgba(200, 175, 255, 0.85));
+@media (hover: hover) and (pointer: fine) {
+  #gadget-spaceship:hover .gadget-ship-icon {
+    filter: drop-shadow(0 0 6px rgba(200, 175, 255, 0.85));
+  }
 }
 
 /* ── Gadget tooltip ── */
@@ -266,11 +272,13 @@ body {
   position: relative;
   transition: box-shadow 0.22s ease;
 }
-#gadget-comet:hover {
-  box-shadow:
-    0 0 0 1px rgba(160, 235, 255, 0.65),
-    0 0 22px 7px rgba(80, 210, 255, 0.70),
-    inset 0 0 10px rgba(0, 0, 0, 0.90);
+@media (hover: hover) and (pointer: fine) {
+  #gadget-comet:hover {
+    box-shadow:
+      0 0 0 1px rgba(160, 235, 255, 0.65),
+      0 0 22px 7px rgba(80, 210, 255, 0.70),
+      inset 0 0 10px rgba(0, 0, 0, 0.90);
+  }
 }
 
 #gadget-comet.active {
@@ -336,11 +344,13 @@ body {
 .gadget-cursor--meteor-shower.on-cooldown .cooldown-ring {
   opacity: 1;
 }
-#gadget-meteor-shower:hover {
-  box-shadow:
-    0 0 0 1px rgba(255, 178, 72, 0.62),
-    0 0 22px 7px rgba(220, 98, 26, 0.62),
-    inset 0 0 10px rgba(0, 0, 0, 0.92);
+@media (hover: hover) and (pointer: fine) {
+  #gadget-meteor-shower:hover {
+    box-shadow:
+      0 0 0 1px rgba(255, 178, 72, 0.62),
+      0 0 22px 7px rgba(220, 98, 26, 0.62),
+      inset 0 0 10px rgba(0, 0, 0, 0.92);
+  }
 }
 
 #gadget-meteor-shower.active {
