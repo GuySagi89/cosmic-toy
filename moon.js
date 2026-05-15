@@ -50,6 +50,8 @@
   let moonDragging     = false;
   let moonDragVel      = 0;
   let moonFrostPatches = [];
+  let moonFreezeEnd   = 0;   // ms timestamp when freeze ends; 0 = not frozen
+  let moonGlobalFrost = 0;   // 0–1 blend toward icy white for the whole moon
 
   let canvas, ctx;
 
@@ -212,6 +214,12 @@
         }
       }
 
+      if (moonGlobalFrost > 0) {
+        r = Math.round(r + moonGlobalFrost * (240 - r));
+        g = Math.round(g + moonGlobalFrost * (250 - g));
+        b = Math.round(b + moonGlobalFrost * (255 - b));
+      }
+
       const alpha = Math.min(1, facing * (0.55 + lit * 0.45));
       const dotR  = Math.max(0.35, 1.6 * facing * s);
 
@@ -267,32 +275,39 @@
       const { vx, vy } = e.detail;
       const speed = Math.hypot(vx, vy) || 1;
       const sf    = Math.min(speed / 400, 2.0);
-      const tangX   = -Math.sin(moonOrbitAngle);
-      const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
-      const tangLen = Math.hypot(tangX, tangY) || 1;
-      const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
-      moonOrbitSpeed += proj * 0.08 * sf;
 
-      if (e.detail.source === 'comet' && e.detail.x != null) {
-        const moon = getMoonPos();
-        const rect = canvas.getBoundingClientRect();
-        const icx  = (e.detail.x - rect.left) * (W / rect.width);
-        const icy  = (e.detail.y - rect.top)  * (H / rect.height);
-        const mr   = MOON_R * moon.s;
-        let nnx = (icx - moon.px) / mr;
-        let nny = (icy - moon.py) / mr;
-        const sq = 1 - nnx * nnx - nny * nny;
-        let nnz = sq > 0 ? -Math.sqrt(sq) : 0;
-        const nl = Math.hypot(nnx, nny, nnz) || 1;
-        nnx /= nl; nny /= nl; nnz /= nl;
-        const cosSA = Math.cos(moonSelfAngle);
-        const sinSA = Math.sin(moonSelfAngle);
-        moonFrostPatches.push({
-          lnx:  nnx * cosSA + nnz * sinSA,
-          lny:  nny,
-          lnz: -nnx * sinSA + nnz * cosSA,
-          startTime: Date.now(),
-        });
+      if (e.detail.source === 'comet') {
+        // Freeze orbit for 3 s and blanket the moon in frost
+        moonFreezeEnd  = Date.now() + 3000;
+        moonOrbitSpeed = 0;
+        if (e.detail.x != null) {
+          const moon = getMoonPos();
+          const rect = canvas.getBoundingClientRect();
+          const icx  = (e.detail.x - rect.left) * (W / rect.width);
+          const icy  = (e.detail.y - rect.top)  * (H / rect.height);
+          const mr   = MOON_R * moon.s;
+          let nnx = (icx - moon.px) / mr;
+          let nny = (icy - moon.py) / mr;
+          const sq = 1 - nnx * nnx - nny * nny;
+          let nnz = sq > 0 ? -Math.sqrt(sq) : 0;
+          const nl = Math.hypot(nnx, nny, nnz) || 1;
+          nnx /= nl; nny /= nl; nnz /= nl;
+          const cosSA = Math.cos(moonSelfAngle);
+          const sinSA = Math.sin(moonSelfAngle);
+          moonFrostPatches.push({
+            lnx:  nnx * cosSA + nnz * sinSA,
+            lny:  nny,
+            lnz: -nnx * sinSA + nnz * cosSA,
+            startTime: Date.now(),
+          });
+        }
+      } else {
+        // Meteors / spaceship just nudge the orbit
+        const tangX   = -Math.sin(moonOrbitAngle);
+        const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
+        const tangLen = Math.hypot(tangX, tangY) || 1;
+        const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
+        moonOrbitSpeed += proj * 0.08 * sf;
       }
     });
   }
@@ -310,7 +325,21 @@
   window.Moon = {
     update() {
       moonSelfAngle += MOON_SELF_SPEED;
-      if (!moonDragging) {
+      const now = Date.now();
+      if (moonFreezeEnd > 0) {
+        if (now < moonFreezeEnd) {
+          moonGlobalFrost = 1.0;
+          moonOrbitSpeed  = 0;
+        } else {
+          const fadeAge   = (now - moonFreezeEnd) / 1000;
+          moonGlobalFrost = Math.max(0, 1 - fadeAge / 2.5);
+          if (moonGlobalFrost <= 0) moonFreezeEnd = 0;
+          if (!moonDragging) {
+            moonOrbitSpeed += (MOON_ORBIT_SPEED - moonOrbitSpeed) * MOON_ORBIT_DECAY;
+            moonOrbitAngle += moonOrbitSpeed;
+          }
+        }
+      } else if (!moonDragging) {
         moonOrbitSpeed += (MOON_ORBIT_SPEED - moonOrbitSpeed) * MOON_ORBIT_DECAY;
         moonOrbitAngle += moonOrbitSpeed;
       }

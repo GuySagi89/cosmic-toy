@@ -87,8 +87,11 @@
   let moonOrbitAngle = 0;
   let moonSelfAngle  = 0;
   let moonOrbitSpeed = MOON_ORBIT_SPEED;
+  let moonSelfSpeed  = MOON_SELF_SPEED;
   let moonDragging   = false;
   let moonDragVel    = 0;
+  let moonFreezeEnd   = 0;
+  let moonGlobalFrost = 0;
 
   const vertices       = [];
   const sortedVertices = [];
@@ -399,6 +402,13 @@
         b = Math.round(b + crater * (104 - b));
       }
 
+      // Global freeze frost — whole moon turns icy white
+      if (moonGlobalFrost > 0) {
+        r = Math.round(r + moonGlobalFrost * (240 - r));
+        g = Math.round(g + moonGlobalFrost * (250 - g));
+        b = Math.round(b + moonGlobalFrost * (255 - b));
+      }
+
       // Frost: blend dots toward icy blue-white based on angular distance in local frame
       if (moonFrostPatches.length) {
         const lnx = d.sinP * d.cosT; // dot normal in moon-local frame (pre-self-rotation)
@@ -543,10 +553,23 @@
 
 
   function tick() {
-    moonSelfAngle += MOON_SELF_SPEED;
+    const frozen = moonFreezeEnd > 0 && Date.now() < moonFreezeEnd;
+    moonSelfSpeed += ((frozen ? 0 : MOON_SELF_SPEED) - moonSelfSpeed) * 0.035;
+    moonSelfAngle += moonSelfSpeed;
     if (!moonDragging) {
-      moonOrbitSpeed += (MOON_ORBIT_SPEED - moonOrbitSpeed) * MOON_ORBIT_DECAY;
-      moonOrbitAngle += moonOrbitSpeed;
+      const now = Date.now();
+      if (moonFreezeEnd > 0 && now < moonFreezeEnd) {
+        moonGlobalFrost = 1.0;
+        moonOrbitSpeed  = 0;
+      } else {
+        if (moonFreezeEnd > 0) {
+          const fadeT = Math.min(1, (now - moonFreezeEnd) / 2500);
+          moonGlobalFrost = 1 - fadeT;
+          if (moonGlobalFrost <= 0) { moonGlobalFrost = 0; moonFreezeEnd = 0; }
+        }
+        moonOrbitSpeed += (MOON_ORBIT_SPEED - moonOrbitSpeed) * MOON_ORBIT_DECAY;
+        moonOrbitAngle += moonOrbitSpeed;
+      }
     }
     const moon = getMoonPos();
 
@@ -822,14 +845,21 @@
     });
 
     window.addEventListener('comet-moon-impact', e => {
-      const { vx, vy } = e.detail;
+      const { vx, vy, source } = e.detail;
       const speed = Math.hypot(vx, vy) || 1;
       const sf    = Math.min(speed / 400, 2.0);
-      const tangX   = -Math.sin(moonOrbitAngle);
-      const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
-      const tangLen = Math.hypot(tangX, tangY) || 1;
-      const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
-      moonOrbitSpeed += proj * 0.08 * sf;
+
+      if (source === 'comet') {
+        moonFreezeEnd   = Date.now() + 3000;
+        moonOrbitSpeed  = 0;
+        moonGlobalFrost = 1.0;
+      } else {
+        const tangX   = -Math.sin(moonOrbitAngle);
+        const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
+        const tangLen = Math.hypot(tangX, tangY) || 1;
+        const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
+        moonOrbitSpeed += proj * 0.08 * sf;
+      }
 
       if (e.detail.source === 'comet' && e.detail.x != null) {
         const moon = getMoonPos();

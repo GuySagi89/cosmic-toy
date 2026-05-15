@@ -126,6 +126,18 @@
           }
         }
 
+        if (!hit && window.Comet) {
+          const allComets = [...window.Comet.getAll()];
+          for (const c of allComets) {
+            if (!c.swirl && Math.hypot(m.x - c.x, m.y - c.y) < 28) {
+              window.Comet.damage(c, 0.5);
+              spawnImpact(m.x, m.y, m.vx, m.vy);
+              hit = true;
+              break;
+            }
+          }
+        }
+
         if (hit || m.age > 4.5 ||
             m.x < -160 || m.x > canvas.width  + 160 ||
             m.y < -160 || m.y > canvas.height + 160) {

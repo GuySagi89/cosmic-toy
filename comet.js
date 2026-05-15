@@ -62,7 +62,7 @@
     const s = Math.hypot(vx, vy);
     if (s > MAX_SPD) { vx = vx / s * MAX_SPD; vy = vy / s * MAX_SPD; }
     if (comets.length >= 5) blastComet(comets.shift(), x, y);
-    comets.push({ x, y, vx, vy });
+    comets.push({ x, y, vx, vy, hp: 3 });
   }
 
   function updateComet(dt) {
@@ -237,10 +237,20 @@
   window.Comet = {
     update: updateComet,
     draw:   drawComet,
+    getAll: () => comets,
+    damage(c, amount) {
+      if (c.swirl || c.hp <= 0) return;
+      c.hp -= amount;
+      if (c.hp <= 0) {
+        spawnImpactDebris(c.x, c.y, c.vx, c.vy);
+        const idx = comets.indexOf(c);
+        if (idx >= 0) comets.splice(idx, 1);
+      }
+    },
     blastInRadius(cx, cy, r) {
       for (let i = comets.length - 1; i >= 0; i--) {
         if (r >= Math.hypot(cx - comets[i].x, cy - comets[i].y) - 8) {
-          blastComet(comets[i], cx, cy);
+          spawnImpactDebris(comets[i].x, comets[i].y, comets[i].vx, comets[i].vy);
           comets.splice(i, 1);
         }
       }
