@@ -6,6 +6,8 @@
   let activeGadget      = null;
   let overlay           = null;
   let cursorEl          = null;
+  let originEl          = null;
+  let lineEl            = null;
   let isDragging        = false;
   let dragStartX        = 0;
   let dragStartY        = 0;
@@ -20,10 +22,47 @@
     cursorEl.style.top  = y + 'px';
   }
 
+  function showDragOrigin(x, y, type) {
+    originEl = document.createElement('div');
+    originEl.className = `gadget-origin-dot gadget-origin-dot--${type}`;
+    originEl.style.left = x + 'px';
+    originEl.style.top  = y + 'px';
+    document.body.appendChild(originEl);
+
+    lineEl = document.createElement('div');
+    lineEl.className = `gadget-drag-line gadget-drag-line--${type}`;
+    lineEl.style.left   = x + 'px';
+    lineEl.style.top    = y + 'px';
+    lineEl.style.width  = '0px';
+    document.body.appendChild(lineEl);
+  }
+
+  function updateDragFeedback(cx, cy) {
+    if (!cursorEl || !lineEl) return;
+    const dx   = cx - dragStartX, dy = cy - dragStartY;
+    const dist  = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (dist > 4) {
+      cursorEl.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
+    }
+    lineEl.style.width     = dist + 'px';
+    lineEl.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+  }
+
+  function hideDragFeedback() {
+    if (originEl) { originEl.remove(); originEl = null; }
+    if (lineEl)   { lineEl.remove();   lineEl   = null; }
+    if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
+  }
+
   function setActiveGadget(type) {
     if (isDragging) {
       isDragging = false;
-      if (activeGadget === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
+      if (activeGadget === 'spaceship') {
+        if (cursorEl) cursorEl.classList.remove('pressing');
+        window.releaseSpaceship && window.releaseSpaceship();
+      }
+      hideDragFeedback();
     }
 
     activeGadget = (activeGadget === type) ? null : type;
@@ -79,12 +118,15 @@
       isDragging = false;
     } else if (activeGadget === 'spaceship') {
       window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+      if (cursorEl) cursorEl.classList.add('pressing');
       overlay.setPointerCapture(e.pointerId);
     } else if (activeGadget === 'comet') {
       cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+      showDragOrigin(dragStartX, dragStartY, 'comet');
       overlay.setPointerCapture(e.pointerId);
     } else if (activeGadget === 'meteor-shower') {
       meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+      showDragOrigin(dragStartX, dragStartY, 'meteor-shower');
       overlay.setPointerCapture(e.pointerId);
     }
   }
@@ -98,17 +140,21 @@
     } else if (activeGadget === 'comet') {
       cometDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
       if (cometDragHistory.length > 10) cometDragHistory.shift();
+      updateDragFeedback(e.clientX, e.clientY);
     } else if (activeGadget === 'meteor-shower') {
       meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
       if (meteorDragHistory.length > 10) meteorDragHistory.shift();
+      updateDragFeedback(e.clientX, e.clientY);
     }
   }
 
   function onUp(e) {
     if (!isDragging) return;
     isDragging = false;
+    hideDragFeedback();
 
     if (activeGadget === 'spaceship') {
+      if (cursorEl) cursorEl.classList.remove('pressing');
       window.releaseSpaceship && window.releaseSpaceship();
     } else if (activeGadget === 'comet' && window.spawnComet) {
       const now    = performance.now();
@@ -157,7 +203,11 @@
   function onCancel() {
     if (!isDragging) return;
     isDragging = false;
-    if (activeGadget === 'spaceship') window.releaseSpaceship && window.releaseSpaceship();
+    hideDragFeedback();
+    if (activeGadget === 'spaceship') {
+      if (cursorEl) cursorEl.classList.remove('pressing');
+      window.releaseSpaceship && window.releaseSpaceship();
+    }
   }
 
   inventory.querySelectorAll('.gadget-slot').forEach(slot => {

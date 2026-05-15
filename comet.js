@@ -3,7 +3,8 @@
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
 
-  let comets = [];
+  let comets     = [];
+  let explosions = [];
 
   function spawnImpactDebris(x, y, vx, vy) {
     const spd  = Math.hypot(vx, vy) || 1;
@@ -57,6 +58,50 @@
     }
   }
 
+  function spawnExplosion(x, y) {
+    explosions.push({ x, y, age: 0, maxAge: 0.65 });
+  }
+
+  function drawExplosion(exp) {
+    const frac = exp.age / exp.maxAge;
+
+    if (frac < 0.5) {
+      const f2 = frac / 0.5;
+      const r  = (1 - f2) * 45 + 6;
+      const fg = ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, r);
+      fg.addColorStop(0,    `rgba(255,255,255,${(1 - f2) * 0.92})`);
+      fg.addColorStop(0.35, `rgba(180,245,255,${(1 - f2) * 0.65})`);
+      fg.addColorStop(1,    'rgba(60,160,255,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(exp.x, exp.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, (1 - frac) * 0.90);
+    ctx.strokeStyle = frac < 0.45 ? 'rgba(210,248,255,1)' : 'rgba(80,185,255,0.85)';
+    ctx.lineWidth   = (1 - frac) * 3.5 + 0.4;
+    ctx.shadowColor = 'rgba(100,220,255,0.7)';
+    ctx.shadowBlur  = 18 * (1 - frac);
+    ctx.beginPath();
+    ctx.arc(exp.x, exp.y, Math.max(0.5, frac * 85), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    if (frac > 0.08) {
+      const f2 = (frac - 0.08) / 0.92;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, (1 - f2) * 0.55);
+      ctx.strokeStyle = 'rgba(160,235,255,0.9)';
+      ctx.lineWidth   = (1 - f2) * 2 + 0.3;
+      ctx.beginPath();
+      ctx.arc(exp.x, exp.y, Math.max(0.5, f2 * 55), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function spawnComet(x, y, vx, vy) {
     const MAX_SPD = 320;
     const s = Math.hypot(vx, vy);
@@ -66,6 +111,11 @@
   }
 
   function updateComet(dt) {
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      explosions[i].age += dt;
+      if (explosions[i].age >= explosions[i].maxAge) explosions.splice(i, 1);
+    }
+
     const allBHs  = window.BlackHole ? window.BlackHole.getAll() : [];
     const globeEl = document.getElementById('globe-canvas');
     const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
@@ -78,8 +128,11 @@
       for (let j = i - 1; j >= 0; j--) {
         if (comets[j].swirl) continue;
         if (Math.hypot(comets[i].x - comets[j].x, comets[i].y - comets[j].y) < 18) {
-          blastComet(comets[i], comets[j].x, comets[j].y);
-          blastComet(comets[j], comets[i].x, comets[i].y);
+          const mx = (comets[i].x + comets[j].x) * 0.5;
+          const my = (comets[i].y + comets[j].y) * 0.5;
+          spawnExplosion(mx, my);
+          spawnImpactDebris(mx, my, comets[i].vx, comets[i].vy);
+          spawnImpactDebris(mx, my, comets[j].vx, comets[j].vy);
           comets.splice(i, 1);
           comets.splice(j, 1);
           i = j;
@@ -175,6 +228,7 @@
   }
 
   function drawComet() {
+    for (const exp of explosions) drawExplosion(exp);
     for (const c of comets) {
       if (c.swirl) {
         const frac  = c.swirl.age / c.swirl.maxAge;

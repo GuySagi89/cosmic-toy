@@ -49,6 +49,31 @@
     const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
     const moon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
 
+    // ── Meteor-meteor collisions (all showers combined) ──────────
+    {
+      const flat = [];
+      for (const s of showers) {
+        for (const m of s.meteors) { if (!m.swirl) flat.push({ s, m }); }
+      }
+      const dead = new Set();
+      for (let i = flat.length - 1; i >= 1; i--) {
+        if (dead.has(flat[i].m)) continue;
+        for (let j = i - 1; j >= 0; j--) {
+          if (dead.has(flat[j].m)) continue;
+          const mi = flat[i].m, mj = flat[j].m;
+          if (Math.hypot(mi.x - mj.x, mi.y - mj.y) < 12) {
+            spawnImpact(mi.x, mi.y, mi.vx, mi.vy);
+            spawnImpact(mj.x, mj.y, mj.vx, mj.vy);
+            dead.add(mi);
+            dead.add(mj);
+          }
+        }
+      }
+      if (dead.size > 0) {
+        for (const s of showers) s.meteors = s.meteors.filter(m => !dead.has(m));
+      }
+    }
+
     for (let si = showers.length - 1; si >= 0; si--) {
       const s = showers[si];
       s.elapsed += dt;

@@ -347,6 +347,27 @@
       }
     }
 
+    // Canvas bounds — reflect velocity, no health penalty
+    const MARGIN = 20;
+    if (spaceship.x < MARGIN && spaceship.vx < 0) {
+      spaceship.x  = MARGIN;
+      spaceship.vx = -spaceship.vx * 0.65;
+      spawnShipImpact(spaceship.x, spaceship.y);
+    } else if (spaceship.x > canvas.width - MARGIN && spaceship.vx > 0) {
+      spaceship.x  = canvas.width - MARGIN;
+      spaceship.vx = -spaceship.vx * 0.65;
+      spawnShipImpact(spaceship.x, spaceship.y);
+    }
+    if (spaceship.y < MARGIN && spaceship.vy < 0) {
+      spaceship.y  = MARGIN;
+      spaceship.vy = -spaceship.vy * 0.65;
+      spawnShipImpact(spaceship.x, spaceship.y);
+    } else if (spaceship.y > canvas.height - MARGIN && spaceship.vy > 0) {
+      spaceship.y  = canvas.height - MARGIN;
+      spaceship.vy = -spaceship.vy * 0.65;
+      spawnShipImpact(spaceship.x, spaceship.y);
+    }
+
     const allBHs = window.BlackHole ? window.BlackHole.getAll() : [];
     for (const bh of allBHs) {
       const dx = bh.x - spaceship.x, dy = bh.y - spaceship.y;
@@ -358,10 +379,6 @@
       }
     }
 
-    if (!spaceship.active) {
-      spaceship.alpha = Math.max(0, spaceship.alpha - dt * 1.3);
-      if (spaceship.alpha <= 0) { spaceship = null; return; }
-    }
   }
 
   function drawSpaceship() {
@@ -608,7 +625,14 @@
   }
 
   window.startSpaceship = function(x, y) {
-    spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
+    if (!spaceship) {
+      spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
+    } else if (!spaceship.exploding && !spaceship.swirl) {
+      spaceship.targetX = x;
+      spaceship.targetY = y;
+      spaceship.active  = true;
+      spaceship.alpha   = 1;
+    }
   };
   window.updateSpaceshipTarget = function(x, y) {
     if (spaceship) { spaceship.targetX = x; spaceship.targetY = y; }

@@ -88,21 +88,11 @@ body {
   user-select: none;
 }
 
-/* Desktop: vertical bar pinned to bottom-right */
+/* Desktop: larger slots, same horizontal layout */
 @media (min-width: 600px) and (min-height: 600px) {
   :root {
     --slot-size: clamp(44px, 5vmin, 58px);
     --slot-gap:  clamp(10px, 1.2vmin, 14px);
-  }
-
-  #gadget-inventory {
-    left: auto;
-    right: 24px;
-    bottom: 24px;
-    transform: none;
-    flex-direction: column;
-    padding: clamp(9px, 1.1vmin, 12px) clamp(7px, 0.85vmin, 10px);
-    border-radius: 18px;
   }
 }
 
@@ -160,6 +150,11 @@ body {
   box-shadow:
     0 0 0 2px rgba(200, 175, 255, 0.95),
     0 0 26px 9px rgba(150, 100, 242, 0.80);
+}
+
+@keyframes ship-icon-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.15; }
 }
 
 #gadget-spaceship.active .gadget-ship-icon {
@@ -422,6 +417,10 @@ body {
   filter: drop-shadow(0 0 4px rgba(200, 175, 255, 0.80));
 }
 
+.gadget-cursor--spaceship.pressing .gadget-cursor-ship-svg {
+  animation: ship-icon-blink 1.8s ease-in-out infinite;
+}
+
 .gadget-cursor--comet {
   background: radial-gradient(circle at 45% 30%, #001a3a 0%, #000814 55%);
   box-shadow:
@@ -488,5 +487,45 @@ body {
     22px 6px 0 -1px rgba(255,240,170,0.75),
     22px 6px 0 2px rgba(255,180,52,0.42);
   pointer-events: none;
+}
+
+/* ── Drag origin dot ── */
+.gadget-origin-dot {
+  position: fixed;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  opacity: 0.9;
+}
+
+.gadget-origin-dot--comet {
+  box-shadow: 0 0 6px 3px rgba(80, 210, 255, 0.85);
+}
+
+.gadget-origin-dot--meteor-shower {
+  box-shadow: 0 0 6px 3px rgba(255, 148, 50, 0.85);
+}
+
+/* ── Drag connector line ── */
+.gadget-drag-line {
+  position: fixed;
+  height: 1.5px;
+  pointer-events: none;
+  z-index: 9997;
+  transform-origin: left center;
+  opacity: 0.45;
+  border-radius: 1px;
+}
+
+.gadget-drag-line--comet {
+  background: linear-gradient(to right, rgba(160, 235, 255, 0.9), rgba(80, 180, 255, 0.2));
+}
+
+.gadget-drag-line--meteor-shower {
+  background: linear-gradient(to right, rgba(255, 200, 80, 0.9), rgba(220, 80, 20, 0.2));
 }
 

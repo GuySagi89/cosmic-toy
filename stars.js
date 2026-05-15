@@ -10,43 +10,6 @@
 
   const COLORS = ['#ffffff', '#ffffff', '#ffffff', '#cce8ff', '#fffbe0', '#ddd0ff'];
 
-  const SILLY_NAMES = [
-    'The Drowsy Kettle',        "Philosopher's Thumb",       'Biscuit Minor',
-    'The Persistent Noodle',    'The Upside-Down Umbrella',  'The Confused Spatula',
-    'Great Sock of the North',  'The Anxious Penguin',       'Mrs Flibbertigibbet',
-    'The Wobbly Accordion',     'The Reluctant Trapezoid',   'Donut of Orion',
-    'The Forgotten Spoon',      "Captain Biscuit's Belt",    'The Melancholy Hamster',
-    'The Overzealous Teapot',   "Schrödinger's Mitten",      'The Tipsy Flamingo',
-    'The Bewildered Zucchini',  'Baron Von Fluffington',     'The Accidental Rhombus',
-    'The Perpetual Hiccup',     'The Soggy Pretzel',         'The Indecisive Blancmange',
-    'The Mysterious Courgette', 'The Reluctant Waltz',       'The Overenthusiastic Snail',
-    "Aunt Mildred's Elbow",     'The Philosophical Pickle',  'The Wistful Ladle',
-    'The Sneezing Cormorant',   'The Slightly Damp Wizard',  'The Optimistic Crumpet',
-    "The Bewildered Archipelago","Uncle Norbert's Sideburn", 'The Galactic Croissant',
-    'The Hesitant Trapeze Artist','Madame Wobblebottom',     'The Cosmic Ketchup Bottle',
-    'The Nervous Cauliflower',  'The Magnificent Dressing Gown','The Inconclusive Badminton',
-    'Reggie the Oblong',        'The Solemn Digestive',      'The Napping Gondolier',
-    'The Pensive Kipper',       'The Philosophical Baguette','The Wandering Clog',
-    'The Startled Bureaucrat',  'The Dignified Casserole',   'The Perplexed Mandolin',
-    'Sir Wobbles a Lot',        'The Timid Pretzel',         'The Existential Waffle',
-    'The Muttering Almanac',    'The Chronic Ditherer',      'The Enthusiastic Potato',
-    'The Brooding Marmalade',   'The Accidental Maestro',    'The Exasperated Monocle',
-    'The Cosmic Oven Mitt',     'The Loitering Syllabub',    'The Oblong Conspiracy',
-    'The Disgruntled Accordion','The Snoring Bureaucrat',    "Professor Noodle's Paradox",
-    'The Interminable Crouton', 'The Lurching Almanac',      'The Indignant Plunger',
-    'The Sentimental Crumpet',  'The Majestic Toadstool',    'The Stuttering Vortex',
-    'The Apologetic Nebula',    'The Forgotten Semicolon',   'The Wheezing Contraption',
-    'The Dignified Fumble',     'The Galactic Macaron',      'The Solemn Wobble',
-    'The Ambitious Sock Drawer','The Bewildered Quiche',     'The Trembling Hypothesis',
-    'Countess Bumbersnatch',    'The Meandering Tuba',       'The Cosmic Hiccup Minor',
-    'The Philosophical Spanner','The Timid Nebula',          'The Pensive Shoelace',
-    'The Reclusive Fondue',     'The Spectacular Anticlimax','The Languishing Obelisk',
-    'The Glum Croissant',       'The Restless Semicolon',    'The Ponderous Blancmange',
-    'The Indecisive Vortex',    'Brigadier Fluffington',     'The Cosmic Dressing Gown',
-    'The Confused Meridian',    'The Melancholy Trapezoid',  'The Oscillating Biscuit Tin',
-    'The Magnificent Kerfuffle', 'Elkabetzium Supreme', 'Eladilolo Major', 'Fredul Minor',
-  ];
-
   // ── Constellation geometry constants ─────────────────────────────────────────
   const ZONE_PAD_X       = 0.12;
   const ZONE_PAD_Y       = 0.10;
@@ -225,11 +188,10 @@
     return defs;
   }
 
-  let sessionDefs, sessionNames;
+  let sessionDefs;
   let bgStars = [], conStars = [], constellations = [], shooting = null;
   let rafId = null, shootTimer = null, active = false, t = 0, lastTimestamp = null;
   let bgGrad = null, neb1 = null, neb2 = null, neb3 = null;
-  let mouseX = -1, mouseY = -1;
 
   function buildBackground() {
     bgGrad = ctx.createRadialGradient(
@@ -295,10 +257,8 @@
         return idx;
       });
       return {
-        name:       sessionNames[ci],
         edges:      def.edges,
         indices,
-        hoverAlpha: 0,
         flashAlpha: 0,
         flashing:   false,
         flashP:     0,
@@ -333,54 +293,6 @@
     shootTimer = setTimeout(() => {
       if (active) { spawnShooting(); scheduleNext(); }
     }, 5000 + Math.random() * 8000);
-  }
-
-  function findHoveredCon() {
-    if (mouseX < 0 || mouseY < 0) return -1;
-    const threshold = Math.max(42, canvas.width * 0.028);
-    for (let ci = 0; ci < constellations.length; ci++) {
-      for (const idx of constellations[ci].indices) {
-        if (Math.hypot(conStars[idx].x - mouseX, conStars[idx].y - mouseY) < threshold) return ci;
-      }
-    }
-    return -1;
-  }
-
-  function drawTooltip(text, x, y, alpha) {
-    const pad = 14, h = 28;
-    ctx.save();
-    ctx.font = 'italic 13px Georgia, "Times New Roman", serif';
-    const tw = ctx.measureText(text).width;
-    const bw = tw + pad * 2;
-    const bx = Math.max(6, Math.min(canvas.width - bw - 6, x - bw / 2));
-    const by = Math.max(6, y - h - 14);
-    const r  = h / 2;
-
-    ctx.globalAlpha = alpha * 0.30;
-    ctx.shadowColor = 'rgba(150, 175, 255, 1)';
-    ctx.shadowBlur  = 16;
-    ctx.fillStyle   = 'rgba(110, 140, 255, 0.18)';
-    ctx.beginPath();
-    ctx.roundRect(bx - 6, by - 6, bw + 12, h + 12, r + 6);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.globalAlpha = alpha * 0.92;
-    ctx.fillStyle   = 'rgba(7, 4, 26, 0.86)';
-    ctx.beginPath();
-    ctx.roundRect(bx, by, bw, h, r);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(165, 190, 255, 0.45)';
-    ctx.lineWidth   = 0.9;
-    ctx.stroke();
-
-    ctx.globalAlpha  = alpha;
-    ctx.fillStyle    = 'rgba(215, 228, 255, 0.97)';
-    ctx.textAlign    = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, bx + pad, by + h / 2);
-    ctx.restore();
   }
 
   function updateSmoke(dt) {
@@ -466,9 +378,6 @@
       ctx.fill();
     });
 
-    const hovered    = findHoveredCon();
-    const anyHovered = hovered >= 0;
-
     for (let ci = 0; ci < constellations.length; ci++) {
       const con = constellations[ci];
 
@@ -490,19 +399,11 @@
         con.flashAlpha = 0;
       }
 
-      con.hoverAlpha += ((ci === hovered ? 1 : 0) - con.hoverAlpha) * 0.07;
+      if (con.flashAlpha < 0.01) continue;
 
-      const isHovered = ci === hovered;
-      const alpha = isHovered
-        ? con.hoverAlpha
-        : anyHovered
-          ? con.flashAlpha * 0.20
-          : Math.max(con.hoverAlpha, con.flashAlpha);
-      if (alpha < 0.01) continue;
-
-      ctx.globalAlpha = alpha * (isHovered ? 0.75 : 0.28);
-      ctx.strokeStyle = isHovered ? 'rgba(220, 235, 255, 1)' : 'rgba(180, 210, 255, 1)';
-      ctx.lineWidth   = isHovered ? 1.3 : 0.7;
+      ctx.globalAlpha = con.flashAlpha * 0.28;
+      ctx.strokeStyle = 'rgba(180, 210, 255, 1)';
+      ctx.lineWidth   = 0.7;
       ctx.lineCap     = 'round';
       for (const [i, j] of con.edges) {
         const sa = conStars[con.indices[i]];
@@ -518,22 +419,6 @@
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
         ctx.stroke();
-      }
-
-      if (con.hoverAlpha > 0.12) {
-        let centX = 0, topY = Infinity;
-        for (const idx of con.indices) {
-          const s = conStars[idx];
-          let sx = s.x, sy = s.y;
-          if (hasLens) {
-            const pos = window.BlackHole.applyLensing(s.x, s.y);
-            if (pos) { sx = pos.x; sy = pos.y; }
-          }
-          centX += sx;
-          if (sy < topY) topY = sy;
-        }
-        centX /= con.indices.length;
-        drawTooltip(con.name, centX, topY, con.hoverAlpha);
       }
     }
 
@@ -600,23 +485,12 @@
     active = true;
     lastTimestamp = null;
     sessionDefs = generateSessionDefs();
-    sessionNames = (() => {
-      const names = SILLY_NAMES.slice().sort(() => Math.random() - 0.5);
-      if (Math.random() < 0.05) names[Math.floor(Math.random() * sessionDefs.length)] = 'Yashi Pozmantiria';
-      return names;
-    })();
     resize();
     rafId = requestAnimationFrame(draw);
     scheduleNext();
   }
 
   window.addEventListener('resize', () => { if (active) resize(); });
-
-  const notGlobe = e => e.target.id !== 'globe-canvas';
-  document.addEventListener('pointermove',  e => { if (notGlobe(e)) { mouseX = e.clientX; mouseY = e.clientY; } });
-  document.addEventListener('pointerleave', () => { mouseX = -1; mouseY = -1; });
-  document.addEventListener('pointerdown',  e => { if (!notGlobe(e)) return; mouseX = e.clientX; mouseY = e.clientY; });
-  document.addEventListener('pointerup',    () => { mouseX = -1; mouseY = -1; });
 
   document.addEventListener('touchmove',   e => e.preventDefault(), { passive: false });
   document.addEventListener('contextmenu', e => e.preventDefault());
