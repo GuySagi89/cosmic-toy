@@ -3,11 +3,12 @@
   const inventory = document.getElementById('gadget-inventory');
   if (!inventory) return;
 
-  let ghost            = null;
-  let gadgetType       = null;
-  let slotCX           = 0;
-  let slotCY           = 0;
-  let cometDragHistory = [];
+  let ghost              = null;
+  let gadgetType         = null;
+  let slotCX             = 0;
+  let slotCY             = 0;
+  let cometDragHistory   = [];
+  let meteorDragHistory  = [];
 
   function spawnGhost(type, clientX, clientY) {
     ghost = document.createElement('div');
@@ -42,6 +43,9 @@
       } else if (gadgetType === 'comet') {
         cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
         spawnGhost('comet', e.clientX, e.clientY);
+      } else if (gadgetType === 'meteor-shower') {
+        meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+        spawnGhost('meteor-shower', e.clientX, e.clientY);
       }
 
       slot.setPointerCapture(e.pointerId);
@@ -69,6 +73,13 @@
         } else {
           angle = Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
         }
+        ghost.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
+      } else if (gadgetType === 'meteor-shower' && ghost) {
+        ghost.style.left = e.clientX + 'px';
+        ghost.style.top  = e.clientY + 'px';
+        meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+        if (meteorDragHistory.length > 10) meteorDragHistory.shift();
+        const angle = Math.atan2(e.clientY - slotCY, e.clientX - slotCX) * 180 / Math.PI;
         ghost.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
       }
     });
@@ -105,6 +116,15 @@
             if (spd > 1200) { vx = vx / spd * 1200; vy = vy / spd * 1200; }
           }
           window.spawnComet(e.clientX, e.clientY, vx, vy);
+        }
+      } else if (gadgetType === 'meteor-shower') {
+        if (ghost) { ghost.remove(); ghost = null; }
+        if (!onInventory && window.spawnMeteorShower) {
+          const dx = e.clientX - slotCX;
+          const dy = e.clientY - slotCY;
+          if (Math.hypot(dx, dy) > 15) {
+            window.spawnMeteorShower(e.clientX, e.clientY, dx, dy);
+          }
         }
       }
 

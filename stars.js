@@ -550,6 +550,9 @@
     window.Comet && window.Comet.update(dt);
     window.Comet && window.Comet.draw(ctx);
 
+    window.MeteorShower && window.MeteorShower.update(dt);
+    window.MeteorShower && window.MeteorShower.draw();
+
     if (shooting) {
       const tailX = shooting.x - shooting.dx * shooting.tail;
       const tailY = shooting.y - shooting.dy * shooting.tail;
