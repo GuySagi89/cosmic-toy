@@ -424,10 +424,11 @@
         }
       }
 
-      // Kill when off-screen
-      if (a.x < -M || a.x > W + M || a.y < -M || a.y > H + M) {
-        a.dead = true;
-      }
+      // Bounce off screen edges
+      if (a.x - a.r < 0)  { a.x = a.r;     a.vx = Math.abs(a.vx); }
+      if (a.x + a.r > W)  { a.x = W - a.r; a.vx = -Math.abs(a.vx); }
+      if (a.y - a.r < 0)  { a.y = a.r;     a.vy = Math.abs(a.vy); }
+      if (a.y + a.r > H)  { a.y = H - a.r; a.vy = -Math.abs(a.vy); }
     }
   }
 
@@ -613,30 +614,6 @@
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // ── 3. Health bar (large & medium only) ─────────────────────────
-    if (a.tier !== 'small' && !a.swirl) {
-      const health = Math.max(0, a.hp / a.maxHp);
-      const BAR_W  = a.r * 2.4;
-      const BAR_H  = 4;
-      const bx     = a.x - BAR_W / 2;
-      const by     = a.y - a.r - 13;
-
-      ctx.save();
-      ctx.globalAlpha = 0.88 * swFrac;
-      ctx.fillStyle = 'rgba(6, 2, 18, 0.80)';
-      ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
-      if (health > 0) {
-        ctx.shadowColor = nc.hex;
-        ctx.shadowBlur  = 5;
-        ctx.fillStyle   = nc.hex;
-        ctx.fillRect(bx, by, BAR_W * health, BAR_H);
-        ctx.shadowBlur  = 0;
-      }
-      ctx.strokeStyle = 'rgba(90, 50, 180, 0.42)';
-      ctx.lineWidth   = 0.7;
-      ctx.strokeRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
-      ctx.restore();
-    }
   }
 
   function draw() {
