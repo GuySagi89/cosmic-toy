@@ -321,6 +321,25 @@
         if (a.frozen === 0) {
           a.thaw = { age: 0, maxAge: 1.5, vx: a.frozenVx, vy: a.frozenVy };
         }
+        if (a.bounceCD > 0) a.bounceCD -= dt;
+        const fship = window.Spaceship && window.Spaceship.get();
+        if (fship && !fship.exploding && !fship.swirl) {
+          const sdx = fship.x - a.x, sdy = fship.y - a.y;
+          const sd  = Math.hypot(sdx, sdy) || 1;
+          const minDist = a.r * 0.75 + 14;
+          if (sd < minDist) {
+            const nx = sdx / sd, ny = sdy / sd;
+            fship.x = a.x + nx * minDist;
+            fship.y = a.y + ny * minDist;
+            const relVn = fship.vx * nx + fship.vy * ny;
+            if (relVn < 0) { fship.vx -= relVn * nx * 1.5; fship.vy -= relVn * ny * 1.5; }
+            if (a.bounceCD <= 0) {
+              a.bounceCD = 0.6;
+              window.Spaceship.hit(fship.x, fship.y, a.frozenVx, a.frozenVy, 2);
+              damageAsteroid(i, 1, a.x, a.y);
+            }
+          }
+        }
         continue;
       }
 
@@ -560,14 +579,20 @@
     ctx.closePath();
 
     if (isFrozen) {
-      const iceGrad = ctx.createRadialGradient(
-        -a.r * 0.20, -a.r * 0.25, 0,
-         a.r * 0.05,  a.r * 0.05, a.r * 1.10
-      );
-      iceGrad.addColorStop(0,    'rgba(215, 245, 255, 0.82)');
-      iceGrad.addColorStop(0.45, 'rgba(120, 195, 235, 0.70)');
-      iceGrad.addColorStop(1,    'rgba(20,  70, 120, 0.88)');
-      ctx.fillStyle = iceGrad;
+      if (hitFrac > 0) {
+        const fr = Math.round(215 + (255 - 215) * hitFrac);
+        const fg = Math.round(245 + (255 - 245) * hitFrac);
+        ctx.fillStyle = `rgba(${fr},${fg},255,${0.72 + hitFrac * 0.28})`;
+      } else {
+        const iceGrad = ctx.createRadialGradient(
+          -a.r * 0.20, -a.r * 0.25, 0,
+           a.r * 0.05,  a.r * 0.05, a.r * 1.10
+        );
+        iceGrad.addColorStop(0,    'rgba(215, 245, 255, 0.82)');
+        iceGrad.addColorStop(0.45, 'rgba(120, 195, 235, 0.70)');
+        iceGrad.addColorStop(1,    'rgba(20,  70, 120, 0.88)');
+        ctx.fillStyle = iceGrad;
+      }
       ctx.fill();
     } else if (hitFrac > 0) {
       const fr = Math.round(nc.r + (255 - nc.r) * hitFrac);
@@ -653,7 +678,7 @@
       ctx.shadowColor = edgeHex;
       ctx.shadowBlur  = glw;
       ctx.globalAlpha = alpha;
-      ctx.strokeStyle = !isFrozen && hitFrac > 0.55 ? '#ffffff' : edgeHex;
+      ctx.strokeStyle = hitFrac > 0.55 ? '#ffffff' : edgeHex;
       ctx.lineWidth   = lw + hitFrac * 1.2;
       ctx.lineCap     = 'round';
       ctx.beginPath();
