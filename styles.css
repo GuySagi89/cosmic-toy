@@ -37,6 +37,7 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
+  cursor: none;
   -webkit-touch-callout: none;
   display: flex;
   align-items: center;
@@ -49,7 +50,7 @@ body {
   display: block;
   width:  min(500px, 72vmin);   /* mobile-first: compact */
   height: min(500px, 72vmin);
-  cursor: default;
+  cursor: none;
   touch-action: none;
   filter:
     drop-shadow(0 0 18px rgba(130, 50, 240, 0.50))
@@ -68,6 +69,10 @@ body {
 /* ── Gadget Inventory ── */
 
 /* Mobile-first: horizontal bar pinned to the bottom center */
+#gadget-inventory,
+#gadget-inventory * { cursor: pointer; }
+#perf-toggle        { cursor: pointer; }
+
 #gadget-inventory {
   position: fixed;
   bottom: 20px;
@@ -778,4 +783,55 @@ body {
   .perf-toggle:hover .perf-toggle-track {
     border-color: rgba(170, 155, 230, 0.55);
   }
+}
+
+/* ── Synthwave Corsair Cursor ── */
+#corsair-cursor {
+  position: fixed;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0;
+  overflow: visible;
+  transition: opacity 0.12s ease;
+  filter: drop-shadow(0 0 5px #00f5ff)
+          drop-shadow(0 0 10px rgba(0, 245, 255, 0.35))
+          drop-shadow(0 0 3px #ff00bb);
+}
+#corsair-cursor svg { width: 100%; height: 100%; display: block; transition: opacity 0.1s; }
+
+/* ── Beacon / sonar mode (while dragging ship) ── */
+.ship-beacon-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(192, 168, 255, 0.85);
+  transform: translate(-50%, -50%);
+  width: 6px; height: 6px;
+  display: none;
+}
+#corsair-cursor.ship-drag {
+  filter: drop-shadow(0 0 6px rgba(180, 140, 255, 0.9))
+          drop-shadow(0 0 12px rgba(140, 90, 255, 0.45));
+}
+#corsair-cursor.ship-drag svg { opacity: 0; }
+#corsair-cursor.ship-drag::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(200, 170, 255, 0.95);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 7px 2px rgba(160, 110, 255, 0.75);
+}
+#corsair-cursor.ship-drag .ship-beacon-ring {
+  display: block;
+  animation: sonar-pulse 1.6s ease-out infinite;
+}
+@keyframes sonar-pulse {
+  0%   { width: 6px;  height: 6px;  opacity: 0.85; }
+  100% { width: 46px; height: 46px; opacity: 0; }
 }

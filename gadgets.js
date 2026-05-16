@@ -20,13 +20,34 @@
   let meteorDragHistory = [];
   let throwParticles    = [];
   let lastTrailTime     = null;
+  let lastMouseX        = 0;
+  let lastMouseY        = 0;
 
+  const CORSAIR_SVG = '<svg viewBox="-24 -24 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle r="20" stroke="#00f5ff" stroke-width="0.8" opacity="0.55"/><line x1="0" y1="-20" x2="0" y2="-9" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="0" y1="9" x2="0" y2="20" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="-20" y1="0" x2="-9" y2="0" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="9" y1="0" x2="20" y2="0" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><path d="M-20,-11 L-20,-20 L-11,-20" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11,-20 L20,-20 L20,-11" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20,11 L20,20 L11,20" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M-11,20 L-20,20 L-20,11" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle r="7" stroke="#ff00bb" stroke-width="1.2"><animate attributeName="opacity" values="1;0.3;1" dur="2.2s" repeatCount="indefinite"/></circle><circle r="1.8" fill="#ff00bb"><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.2s" repeatCount="indefinite"/></circle></svg>';
   const ASTEROID_SVG = '<svg class="gadget-cursor-asteroid-svg" viewBox="-20 -20 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-18 10,-13 17,-4 15,9 6,17 -7,16 -16,7 -15,-6 -8,-16" fill="rgba(0,28,32,0.85)" stroke="#00f5ff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="3" cy="-4" r="2.5" fill="rgba(0,245,255,0.12)" stroke="#00f5ff" stroke-width="0.8"/></svg>';
 
   function moveCursor(x, y) {
     if (!cursorEl) return;
     cursorEl.style.left = x + 'px';
     cursorEl.style.top  = y + 'px';
+  }
+
+  const corsairEl = document.createElement('div');
+  corsairEl.id = 'corsair-cursor';
+  corsairEl.innerHTML = CORSAIR_SVG;
+  for (let i = 0; i < 3; i++) {
+    const ring = document.createElement('div');
+    ring.className = 'ship-beacon-ring';
+    ring.style.animationDelay = (i * 0.53) + 's';
+    corsairEl.appendChild(ring);
+  }
+  document.body.appendChild(corsairEl);
+
+  function updateCorsairVisibility(x, y) {
+    if (activeGadget) { corsairEl.style.opacity = '0'; return; }
+    const over   = document.elementFromPoint(x, y);
+    const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle'));
+    corsairEl.style.opacity = overUI ? '0' : '1';
   }
 
   const TRAIL_MS = 200;
@@ -197,6 +218,8 @@
       moonSlot.classList.toggle('deployed', window.Moon.isDeployed() && !activeGadget);
     }
 
+    updateCorsairVisibility(lastMouseX, lastMouseY);
+
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
     if (activeGadget) {
       cursorEl = document.createElement('div');
@@ -231,7 +254,19 @@
 
   // Track cursor even when pointer is over inventory (above the overlay)
   document.addEventListener('pointermove', e => {
-    if (!cursorEl) return;
+    if (e.pointerType === 'mouse') {
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      corsairEl.style.left = e.clientX + 'px';
+      corsairEl.style.top  = e.clientY + 'px';
+    }
+
+    if (!cursorEl) {
+      if (e.pointerType === 'mouse' && lastPointerType === 'mouse') {
+        updateCorsairVisibility(e.clientX, e.clientY);
+      }
+      return;
+    }
     // Only move cursor for the active tracked pointer or any mouse
     if (e.pointerType === 'mouse' || e.pointerId === activePointerId || activePointerId === null) {
       moveCursor(e.clientX, e.clientY);
@@ -249,7 +284,10 @@
     const over = document.elementFromPoint(e.clientX, e.clientY);
     cursorEl.style.opacity = (over && inventory.contains(over)) ? '0'
       : cursorEl.classList.contains('on-cooldown') ? '0.52' : '1';
+    updateCorsairVisibility(e.clientX, e.clientY);
   }, { capture: true });
+
+  document.addEventListener('mouseleave', () => { corsairEl.style.opacity = '0'; });
 
   function onDown(e) {
     if (e.button !== 0) return;
@@ -438,6 +476,17 @@
     let pendingStartX    = 0, pendingStartY = 0;
     let pendingIsDrag    = false;
 
+    function showBeacon() {
+      corsairEl.classList.add('ship-drag');
+      corsairEl.style.opacity = '1';
+    }
+
+    function hideBeacon() {
+      corsairEl.classList.remove('ship-drag');
+      corsairEl.style.opacity = '';
+      updateCorsairVisibility(lastMouseX, lastMouseY);
+    }
+
     document.body.addEventListener('pointerdown', e => {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       if (activeGadget) return;
@@ -447,7 +496,10 @@
       pendingStartX    = e.clientX;
       pendingStartY    = e.clientY;
       pendingIsDrag    = (e.pointerType !== 'touch');
-      if (pendingIsDrag) window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+      if (pendingIsDrag) {
+        window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+        showBeacon();
+      }
     });
 
     document.body.addEventListener('pointermove', e => {
@@ -459,8 +511,13 @@
       if (!pendingIsDrag && Math.hypot(e.clientX - pendingStartX, e.clientY - pendingStartY) > 12) {
         pendingIsDrag = true;
         window.startSpaceship && window.startSpaceship(pendingStartX, pendingStartY);
+        showBeacon();
       }
-      if (pendingIsDrag) window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+      if (pendingIsDrag) {
+        corsairEl.style.left = e.clientX + 'px';
+        corsairEl.style.top  = e.clientY + 'px';
+        window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+      }
     });
 
     const endShipControl = e => {
@@ -468,6 +525,7 @@
       const wasDrag = pendingIsDrag;
       pendingPointerId = null;
       pendingIsDrag    = false;
+      hideBeacon();
       if (activeGadget) return;
       if (wasDrag) window.releaseSpaceship && window.releaseSpaceship();
       else if (e.type === 'pointerup' && e.pointerType === 'touch') {
