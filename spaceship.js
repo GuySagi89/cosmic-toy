@@ -351,7 +351,8 @@
       spaceship.angle = lerpAngle(spaceship.angle, Math.atan2(spaceship.vy, spaceship.vx) + Math.PI / 2, dt * 8);
     }
 
-    if (spd > 25 && window.smokeParticles.length < 300) {
+    const smokeLimit = window.perfMode ? 60 : 300;
+    if (spd > 25 && window.smokeParticles.length < smokeLimit) {
       spaceship.emitAccum += dt * (spd / 80) * 60;
       while (spaceship.emitAccum >= 1) { emitSmoke(); spaceship.emitAccum--; }
     }
@@ -667,7 +668,7 @@
     }
 
     ctx.shadowColor = `rgba(${glR}, ${glG}, ${glB}, 0.9)`;
-    ctx.shadowBlur  = 14 + (hits >= 7 ? fl * 28 : 0);
+    ctx.shadowBlur  = window.perfMode ? 0 : 14 + (hits >= 7 ? fl * 28 : 0);
 
     ctx.beginPath();
     ctx.moveTo( 0, -15);
@@ -692,7 +693,7 @@
     ctx.stroke();
 
     ctx.shadowColor = 'rgba(148, 232, 255, 0.9)';
-    ctx.shadowBlur  = 8;
+    ctx.shadowBlur  = window.perfMode ? 0 : 8;
     ctx.beginPath();
     ctx.ellipse(0, -6, 2.5, 5, 0, 0, Math.PI * 2);
     ctx.fillStyle   = 'rgba(172, 238, 255, 0.92)';

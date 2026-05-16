@@ -477,4 +477,16 @@
   // Fallback: catch pointer release even when the overlay loses capture (e.g. after contextmenu)
   window.addEventListener('pointerup',     onUp);
   window.addEventListener('pointercancel', onCancel);
+
+  // Performance mode toggle
+  const perfToggle = document.getElementById('perf-toggle');
+  if (perfToggle) {
+    window.perfMode = localStorage.getItem('perfMode') === '1';
+    perfToggle.classList.toggle('active', window.perfMode);
+    perfToggle.addEventListener('click', () => {
+      window.perfMode = !window.perfMode;
+      localStorage.setItem('perfMode', window.perfMode ? '1' : '0');
+      perfToggle.classList.toggle('active', window.perfMode);
+    });
+  }
 })();
