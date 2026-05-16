@@ -312,7 +312,14 @@
       spaceship.vy *= Math.pow(0.95, dt * 60);
       spaceship.x  += spaceship.vx * dt;
       spaceship.y  += spaceship.vy * dt;
-      if (spaceship.explodeAge >= spaceship.explodeMaxAge) spaceship = null;
+      if (spaceship.explodeAge >= spaceship.explodeMaxAge) {
+        spaceship = null;
+        setTimeout(() => {
+          if (spaceship) return;
+          const cx = canvas.width / 2, cy = canvas.height / 2;
+          spaceship = { x: cx, y: cy, targetX: cx, targetY: cy, vx: 0, vy: 0, angle: 0, active: false, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
+        }, 2000);
+      }
       return;
     }
 
@@ -797,4 +804,10 @@
       if (spaceship.hits >= 20) triggerShipExplosion();
     },
   };
+
+  window.addEventListener('load', function () {
+    const cx = canvas.width  / 2 || window.innerWidth  / 2;
+    const cy = canvas.height / 2 || window.innerHeight / 2;
+    spaceship = { x: cx, y: cy, targetX: cx, targetY: cy, vx: 0, vy: 0, angle: 0, active: false, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
+  });
 })();
