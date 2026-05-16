@@ -307,7 +307,7 @@
   function onMove(e) {
     if (activePointerId !== null && e.pointerId !== activePointerId) return;
     moveCursor(e.clientX, e.clientY);
-    if (activeGadget === 'spaceship' && e.pointerType === 'mouse') {
+    if (activeGadget === 'spaceship') {
       const ship = window.Spaceship && window.Spaceship.get();
       if (ship && !ship.exploding && !ship.swirl) {
         ship._aimX = e.clientX;
