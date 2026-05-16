@@ -5,6 +5,7 @@
   const canvas = document.getElementById('stars-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  const { rng, getGlobeBounds } = window.CosmicUtils;
 
   // Synthwave neon palette — each entry has hex + precomputed RGB + dark fill
   const NEON = [
@@ -26,8 +27,6 @@
 
   let asteroids = [];
   let fragments = [];
-
-  function rng(a, b) { return a + Math.random() * (b - a); }
 
   const MOBILE_MQ = window.matchMedia('(min-width: 600px) and (min-height: 600px)');
   function sizeScale() { return MOBILE_MQ.matches ? 1 : 0.5; }
@@ -388,7 +387,8 @@
       if (p.life <= 0) fragments.splice(i, 1);
     }
 
-    const allBHs = window.BlackHole ? window.BlackHole.getAll() : [];
+    const g    = getGlobeBounds();
+    const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
     const W = canvas.width, H = canvas.height;
 
     // Asteroid-asteroid collisions
@@ -475,36 +475,12 @@
 
       // BH swirl animation
       if (a.swirl) {
-        const sw   = a.swirl;
-        sw.age    += dt;
-        if (sw.bh.age >= sw.bh.maxAge) { a.dead = true; continue; }
-        const frac = sw.age / sw.maxAge;
-        const r    = sw.r * Math.pow(1 - frac, 0.65);
-        const bhF  = sw.bh.age / sw.bh.maxAge;
-        const bhEv = Math.max(0, (bhF - 0.92) / 0.08);
-        const rs   = sw.bh.baseRadius * Math.max(0.05, 1 - bhEv * 0.9);
-        if (frac >= 1 || r <= rs) { a.dead = true; continue; }
-        sw.angle  += (3 + frac * 10) * dt;
-        a.x        = sw.bh.x + Math.cos(sw.angle) * r;
-        a.y        = sw.bh.y + Math.sin(sw.angle) * r;
+        if (window.BlackHole.updateSwirl(a, dt)) a.dead = true;
         continue;
       }
 
       // BH gravity pull
-      for (const bh of allBHs) {
-        const dx = bh.x - a.x, dy = bh.y - a.y;
-        const d  = Math.hypot(dx, dy);
-        if (d < bh.baseRadius * 8) {
-          a.swirl = { bh, angle: Math.atan2(a.y - bh.y, a.x - bh.x), r: Math.max(d, 6), age: 0, maxAge: 2.5 };
-          break;
-        }
-        if (d < bh.baseRadius * 30) {
-          const g = 1000000 / (d * d);
-          a.vx += (dx / d) * g * dt;
-          a.vy += (dy / d) * g * dt;
-        }
-      }
-      if (a.swirl) continue;
+      if (window.BlackHole && window.BlackHole.applyGravity(a, dt, { swirlMaxAge: 2.5, gravityK: 1000000, minSwirlR: 6 })) continue;
 
       a.x += a.vx * dt;
       a.y += a.vy * dt;
@@ -512,18 +488,13 @@
       if (a.bounceCD > 0) a.bounceCD -= dt;
 
       // Globe collision
-      const globeEl = document.getElementById('globe-canvas');
-      if (globeEl) {
-        const gr     = globeEl.getBoundingClientRect();
-        const gcx    = gr.left + gr.width  / 2;
-        const gcy    = gr.top  + gr.height / 2;
-        const globeR = gr.width * 0.22;
-        const bdx    = a.x - gcx, bdy = a.y - gcy;
-        const bdist  = Math.hypot(bdx, bdy);
-        if (bdist < globeR + a.r * 0.75) {
+      if (g) {
+        const bdx   = a.x - g.x, bdy = a.y - g.y;
+        const bdist = Math.hypot(bdx, bdy);
+        if (bdist < g.r + a.r * 0.75) {
           const nx = bdx / (bdist || 1), ny = bdy / (bdist || 1);
-          a.x = gcx + nx * (globeR + a.r * 0.75);
-          a.y = gcy + ny * (globeR + a.r * 0.75);
+          a.x = g.x + nx * (g.r + a.r * 0.75);
+          a.y = g.y + ny * (g.r + a.r * 0.75);
           const dot = a.vx * nx + a.vy * ny;
           if (dot < 0) { a.vx = (a.vx - 2 * dot * nx) * 0.55; a.vy = (a.vy - 2 * dot * ny) * 0.55; }
           if (a.bounceCD <= 0) {
@@ -538,7 +509,6 @@
       }
 
       // Moon collision
-      const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
       if (moon) {
         const mdx   = a.x - moon.x, mdy = a.y - moon.y;
         const mdist = Math.hypot(mdx, mdy);

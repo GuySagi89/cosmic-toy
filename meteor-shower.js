@@ -2,6 +2,7 @@
 (function () {
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
+  const { updateCooldownUI, addTrailPoint, getGlobeBounds } = window.CosmicUtils;
 
   const COUNT          = 28;
   const SPAWN_DURATION = 1.4;   // s to emit all meteors
@@ -15,29 +16,12 @@
   let impacts  = [];
   let cooldown = 0;
 
-  function updateCooldownUI() {
-    const pct = cooldown > 0
-      ? `${((1 - cooldown / COOLDOWN_MAX) * 100).toFixed(1)}%`
-      : '0%';
-    const active = cooldown > 0;
-    for (const el of [
-      document.getElementById('gadget-meteor-shower'),
-      document.querySelector('.gadget-cursor--meteor-shower'),
-    ]) {
-      if (!el) continue;
-      const wasOnCooldown = el.classList.contains('on-cooldown');
-      el.style.setProperty('--cd-pct', pct);
-      el.classList.toggle('on-cooldown', active);
-      if (el.classList.contains('gadget-cursor')) {
-        const cur = parseFloat(el.style.opacity);
-        if (cur > 0) el.style.opacity = active ? '0.52' : '1';
-      }
-      if (wasOnCooldown && !active && el.classList.contains('gadget-slot')) {
-        el.classList.remove('ready-flash');
-        void el.offsetWidth;
-        el.classList.add('ready-flash');
-        el.addEventListener('animationend', () => el.classList.remove('ready-flash'), { once: true });
-      }
+  function refreshCooldownUI() {
+    updateCooldownUI('meteor-shower', cooldown, COOLDOWN_MAX);
+    const cursorEl = document.querySelector('.gadget-cursor--meteor-shower');
+    if (cursorEl) {
+      const cur = parseFloat(cursorEl.style.opacity);
+      if (cur > 0) cursorEl.style.opacity = cooldown > 0 ? '0.52' : '1';
     }
   }
 
@@ -55,7 +39,7 @@
       meteors: [],
     });
     cooldown = COOLDOWN_MAX;
-    updateCooldownUI();
+    refreshCooldownUI();
   }
 
   function spawnOne(s) {
@@ -76,13 +60,11 @@
   function update(dt) {
     if (cooldown > 0) {
       cooldown = Math.max(0, cooldown - dt);
-      updateCooldownUI();
+      refreshCooldownUI();
     }
 
-    const allBHs  = window.BlackHole ? window.BlackHole.getAll() : [];
-    const globeEl = document.getElementById('globe-canvas');
-    const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
-    const moon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+    const g    = getGlobeBounds();
+    const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
 
     // ── Meteor-meteor collisions (all showers combined) ──────────
     {
@@ -123,55 +105,26 @@
 
         // Swirl into black hole
         if (m.swirl) {
-          const sw   = m.swirl;
-          sw.age    += dt;
-          if (sw.bh.age >= sw.bh.maxAge) { s.meteors.splice(mi, 1); continue; }
-          const frac = sw.age / sw.maxAge;
-          const r    = sw.r * Math.pow(1 - frac, 0.65);
-          const bhF  = sw.bh.age / sw.bh.maxAge;
-          const bhEv = Math.max(0, (bhF - 0.92) / 0.08);
-          const rs   = sw.bh.baseRadius * Math.max(0.05, 1 - bhEv * 0.9);
-          if (frac >= 1 || r <= rs) { s.meteors.splice(mi, 1); continue; }
-          sw.angle += (3 + frac * 10) * dt;
-          m.x = sw.bh.x + Math.cos(sw.angle) * r;
-          m.y = sw.bh.y + Math.sin(sw.angle) * r;
+          if (window.BlackHole.updateSwirl(m, dt)) s.meteors.splice(mi, 1);
           continue;
         }
 
         // Black hole gravity
-        for (const bh of allBHs) {
-          const dx = bh.x - m.x, dy = bh.y - m.y;
-          const d  = Math.hypot(dx, dy);
-          if (d < bh.baseRadius * 8) {
-            m.swirl = { bh, angle: Math.atan2(m.y - bh.y, m.x - bh.x), r: Math.max(d, 4), age: 0, maxAge: 1.2 };
-            break;
-          }
-          if (d < bh.baseRadius * 30) {
-            const g = 1200000 / (d * d);
-            m.vx += (dx / d) * g * dt;
-            m.vy += (dy / d) * g * dt;
-          }
-        }
-        if (m.swirl) continue;
+        if (window.BlackHole && window.BlackHole.applyGravity(m, dt, { swirlMaxAge: 1.2, gravityK: 1200000, minSwirlR: 4 })) continue;
 
-        m.trail.unshift({ x: m.x, y: m.y });
-        if (m.trail.length > 8) m.trail.pop();
+        addTrailPoint(m.trail, 8, m.x, m.y);
 
         m.x += m.vx * dt;
         m.y += m.vy * dt;
 
         let hit = false;
 
-        if (gr) {
-          const gcx = gr.left + gr.width  * 0.5;
-          const gcy = gr.top  + gr.height * 0.5;
-          if (Math.hypot(m.x - gcx, m.y - gcy) < gr.width * 0.22 + m.r) {
-            window.dispatchEvent(new CustomEvent('comet-globe-impact', {
-              detail: { x: m.x, y: m.y, vx: m.vx * 0.055, vy: m.vy * 0.055, source: 'meteor' }
-            }));
-            spawnImpact(m.x, m.y, m.vx, m.vy);
-            hit = true;
-          }
+        if (g && Math.hypot(m.x - g.x, m.y - g.y) < g.r + m.r) {
+          window.dispatchEvent(new CustomEvent('comet-globe-impact', {
+            detail: { x: m.x, y: m.y, vx: m.vx * 0.055, vy: m.vy * 0.055, source: 'meteor' }
+          }));
+          spawnImpact(m.x, m.y, m.vx, m.vy);
+          hit = true;
         }
 
         if (!hit && moon && Math.hypot(m.x - moon.x, m.y - moon.y) < moon.r * 1.2 + m.r) {

@@ -2,19 +2,13 @@
 (function () {
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
+  const { lerpAngle, addTrailPoint, getGlobeBounds } = window.CosmicUtils;
 
   let spaceship    = null;
   let shipImpacts  = [];
   let shipDebris   = [];
   let lasers       = [];
   let laserImpacts = [];
-
-  function lerpAngle(a, b, t) {
-    let d = (b - a) % (Math.PI * 2);
-    if (d >  Math.PI) d -= Math.PI * 2;
-    if (d < -Math.PI) d += Math.PI * 2;
-    return a + d * Math.min(1, t);
-  }
 
   function emitSmoke() {
     if (!spaceship) return;
@@ -288,8 +282,7 @@
       for (let i = lasers.length - 1; i >= 0; i--) {
         const l   = lasers[i];
         l.age    += dt;
-        l.trail.unshift({ x: l.x, y: l.y });
-        if (l.trail.length > 6) l.trail.pop();
+        addTrailPoint(l.trail, 6, l.x, l.y);
         l.x += l.vx * dt;
         l.y += l.vy * dt;
 
@@ -429,18 +422,14 @@
 
     if (spaceship.bounceCD > 0) spaceship.bounceCD -= dt;
 
-    const globeEl = document.getElementById('globe-canvas');
-    if (globeEl) {
-      const gr     = globeEl.getBoundingClientRect();
-      const gcx    = gr.left + gr.width  / 2;
-      const gcy    = gr.top  + gr.height / 2;
-      const globeR = gr.width * 0.22;
-      const bdx    = spaceship.x - gcx, bdy = spaceship.y - gcy;
-      const bdist  = Math.hypot(bdx, bdy);
-      if (bdist < globeR + 8) {
+    const gb = getGlobeBounds();
+    if (gb) {
+      const bdx   = spaceship.x - gb.x, bdy = spaceship.y - gb.y;
+      const bdist = Math.hypot(bdx, bdy);
+      if (bdist < gb.r + 8) {
         const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
-        spaceship.x = gcx + nx * (globeR + 8);
-        spaceship.y = gcy + ny * (globeR + 8);
+        spaceship.x = gb.x + nx * (gb.r + 8);
+        spaceship.y = gb.y + ny * (gb.r + 8);
         const dot = spaceship.vx * nx + spaceship.vy * ny;
         if (spaceship.bounceCD <= 0) {
           if (dot < 0) {
@@ -462,33 +451,31 @@
       }
     }
 
-    if (window.getMoonScreenPos) {
-      const m = window.getMoonScreenPos();
-      if (m) {
-        const bdx   = spaceship.x - m.x, bdy = spaceship.y - m.y;
-        const bdist = Math.hypot(bdx, bdy);
-        if (bdist < m.r + 8) {
-          const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
-          spaceship.x = m.x + nx * (m.r + 8);
-          spaceship.y = m.y + ny * (m.r + 8);
-          const dot = spaceship.vx * nx + spaceship.vy * ny;
-          if (spaceship.bounceCD <= 0) {
-            if (dot < 0) {
-              const inVx = spaceship.vx, inVy = spaceship.vy;
-              spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
-              spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
-              spawnBounceDebris(spaceship.x, spaceship.y, inVx, inVy);
-              spawnShipImpact(spaceship.x, spaceship.y);
-              window.dispatchEvent(new CustomEvent('comet-moon-impact',
-                { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
-              spaceship.hits++;
-              if (spaceship.hits >= 20) triggerShipExplosion();
-            }
-            spaceship.bounceCD = 0.5;
-          } else if (dot < 0) {
-            spaceship.vx -= dot * nx;
-            spaceship.vy -= dot * ny;
+    const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+    if (moon) {
+      const bdx   = spaceship.x - moon.x, bdy = spaceship.y - moon.y;
+      const bdist = Math.hypot(bdx, bdy);
+      if (bdist < moon.r + 8) {
+        const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
+        spaceship.x = moon.x + nx * (moon.r + 8);
+        spaceship.y = moon.y + ny * (moon.r + 8);
+        const dot = spaceship.vx * nx + spaceship.vy * ny;
+        if (spaceship.bounceCD <= 0) {
+          if (dot < 0) {
+            const inVx = spaceship.vx, inVy = spaceship.vy;
+            spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
+            spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
+            spawnBounceDebris(spaceship.x, spaceship.y, inVx, inVy);
+            spawnShipImpact(spaceship.x, spaceship.y);
+            window.dispatchEvent(new CustomEvent('comet-moon-impact',
+              { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
+            spaceship.hits++;
+            if (spaceship.hits >= 20) triggerShipExplosion();
           }
+          spaceship.bounceCD = 0.5;
+        } else if (dot < 0) {
+          spaceship.vx -= dot * nx;
+          spaceship.vy -= dot * ny;
         }
       }
     }

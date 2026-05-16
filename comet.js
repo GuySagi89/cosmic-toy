@@ -2,6 +2,7 @@
 (function () {
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
+  const { updateCooldownUI, getGlobeBounds } = window.CosmicUtils;
 
   let comets      = [];
   let explosions  = [];
@@ -169,26 +170,6 @@
   let cooldown       = 0;
   const COOLDOWN_MAX = 10;
 
-  function updateCooldownUI() {
-    const pct    = cooldown > 0 ? `${((1 - cooldown / COOLDOWN_MAX) * 100).toFixed(1)}%` : '0%';
-    const active = cooldown > 0;
-    for (const el of [
-      document.getElementById('gadget-comet'),
-      document.querySelector('.gadget-cursor--comet'),
-    ]) {
-      if (!el) continue;
-      const wasOnCooldown = el.classList.contains('on-cooldown');
-      el.style.setProperty('--cd-pct', pct);
-      el.classList.toggle('on-cooldown', active);
-      if (wasOnCooldown && !active && el.classList.contains('gadget-slot')) {
-        el.classList.remove('ready-flash');
-        void el.offsetWidth;
-        el.classList.add('ready-flash');
-        el.addEventListener('animationend', () => el.classList.remove('ready-flash'), { once: true });
-      }
-    }
-  }
-
   function spawnComet(x, y, vx, vy) {
     if (cooldown > 0) return;
     const MAX_SPD = 320;
@@ -197,13 +178,13 @@
     if (comets.length >= 5) blastComet(comets.shift(), x, y);
     comets.push({ x, y, vx, vy, hp: 3 });
     cooldown = COOLDOWN_MAX;
-    updateCooldownUI();
+    updateCooldownUI('comet', cooldown, COOLDOWN_MAX);
   }
 
   function updateComet(dt) {
     if (cooldown > 0) {
       cooldown = Math.max(0, cooldown - dt);
-      updateCooldownUI();
+      updateCooldownUI('comet', cooldown, COOLDOWN_MAX);
     }
     for (let i = explosions.length - 1; i >= 0; i--) {
       explosions[i].age += dt;
@@ -222,11 +203,9 @@
       }
     }
 
-    const allBHs  = window.BlackHole ? window.BlackHole.getAll() : [];
-    const globeEl = document.getElementById('globe-canvas');
-    const gr      = globeEl ? globeEl.getBoundingClientRect() : null;
-    const moon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
-    const margin  = 120;
+    const g      = getGlobeBounds();
+    const moon   = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+    const margin = 120;
 
     // Comet-comet collisions
     for (let i = comets.length - 1; i >= 1; i--) {
@@ -251,35 +230,11 @@
       const c = comets[i];
 
       if (c.swirl) {
-        const sw   = c.swirl;
-        sw.age    += dt;
-        if (sw.bh.age >= sw.bh.maxAge) { comets.splice(i, 1); continue; }
-        const frac = sw.age / sw.maxAge;
-        const r    = sw.r * Math.pow(1 - frac, 0.65);
-        const bhF  = sw.bh.age / sw.bh.maxAge;
-        const bhEv = Math.max(0, (bhF - 0.92) / 0.08);
-        const rs   = sw.bh.baseRadius * Math.max(0.05, 1 - bhEv * 0.9);
-        if (frac >= 1 || r <= rs) { comets.splice(i, 1); continue; }
-        sw.angle += (3 + frac * 10) * dt;
-        c.x = sw.bh.x + Math.cos(sw.angle) * r;
-        c.y = sw.bh.y + Math.sin(sw.angle) * r;
+        if (window.BlackHole.updateSwirl(c, dt)) comets.splice(i, 1);
         continue;
       }
 
-      for (const bh of allBHs) {
-        const dx = bh.x - c.x, dy = bh.y - c.y;
-        const d  = Math.hypot(dx, dy);
-        if (d < bh.baseRadius * 8) {
-          c.swirl = { bh, angle: Math.atan2(c.y - bh.y, c.x - bh.x), r: Math.max(d, 4), age: 0, maxAge: 1.2 };
-          break;
-        }
-        if (d < bh.baseRadius * 30) {
-          const g = 1200000 / (d * d);
-          c.vx += (dx / d) * g * dt;
-          c.vy += (dy / d) * g * dt;
-        }
-      }
-      if (c.swirl) continue;
+      if (window.BlackHole && window.BlackHole.applyGravity(c, dt, { swirlMaxAge: 1.2, gravityK: 1200000, minSwirlR: 4 })) continue;
 
       c.x += c.vx * dt;
       c.y += c.vy * dt;
@@ -309,16 +264,12 @@
         comets.splice(i, 1); continue;
       }
 
-      if (gr) {
-        const gcx = gr.left + gr.width  / 2;
-        const gcy = gr.top  + gr.height / 2;
-        if (Math.hypot(c.x - gcx, c.y - gcy) < gr.width * 0.22) {
-          window.dispatchEvent(new CustomEvent('comet-globe-impact',
-            { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
-          spawnImpactDebris(c.x, c.y, c.vx, c.vy);
-          spawnFreezeRing(c.x, c.y);
-          comets.splice(i, 1); continue;
-        }
+      if (g && Math.hypot(c.x - g.x, c.y - g.y) < g.r) {
+        window.dispatchEvent(new CustomEvent('comet-globe-impact',
+          { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
+        spawnImpactDebris(c.x, c.y, c.vx, c.vy);
+        spawnFreezeRing(c.x, c.y);
+        comets.splice(i, 1); continue;
       }
 
       if (moon && Math.hypot(c.x - moon.x, c.y - moon.y) < moon.r * 1.4) {

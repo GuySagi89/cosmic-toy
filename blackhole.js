@@ -2,31 +2,12 @@
 (function () {
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
+  const { updateCooldownUI } = window.CosmicUtils;
 
   let blackHole       = null;
   let dyingBlackHoles = [];
   let cooldown        = 0;
   const COOLDOWN_MAX  = 30;
-
-  function updateCooldownUI() {
-    const pct    = cooldown > 0 ? `${((1 - cooldown / COOLDOWN_MAX) * 100).toFixed(1)}%` : '0%';
-    const active = cooldown > 0;
-    for (const el of [
-      document.getElementById('gadget-blackhole'),
-      document.querySelector('.gadget-cursor--blackhole'),
-    ]) {
-      if (!el) continue;
-      const wasOnCooldown = el.classList.contains('on-cooldown');
-      el.style.setProperty('--cd-pct', pct);
-      el.classList.toggle('on-cooldown', active);
-      if (wasOnCooldown && !active && el.classList.contains('gadget-slot')) {
-        el.classList.remove('ready-flash');
-        void el.offsetWidth;
-        el.classList.add('ready-flash');
-        el.addEventListener('animationend', () => el.classList.remove('ready-flash'), { once: true });
-      }
-    }
-  }
 
   function spawnBlackHole(x, y) {
     if (cooldown > 0) return;
@@ -40,7 +21,7 @@
     }
     blackHole = { x, y, baseRadius: 28 * (window.gadgetScale || 1), age: 0, maxAge: 5.5, rotation: 0, explodeFired: false };
     cooldown = COOLDOWN_MAX;
-    updateCooldownUI();
+    updateCooldownUI('blackhole', cooldown, COOLDOWN_MAX);
   }
 
   function lensedPos(sx, sy, bh) {
@@ -224,7 +205,7 @@
     update(dt) {
       if (cooldown > 0) {
         cooldown = Math.max(0, cooldown - dt);
-        updateCooldownUI();
+        updateCooldownUI('blackhole', cooldown, COOLDOWN_MAX);
       }
       for (let i = dyingBlackHoles.length - 1; i >= 0; i--) {
         const bh = dyingBlackHoles[i];
@@ -250,5 +231,38 @@
     hasAny:       () => !!(blackHole || dyingBlackHoles.length),
     applyLensing: (x, y) => applyAllLensing(x, y),
     getAll:       () => blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles],
+    updateSwirl(obj, dt) {
+      const sw = obj.swirl;
+      sw.age += dt;
+      if (sw.bh.age >= sw.bh.maxAge) return true;
+      const frac = sw.age / sw.maxAge;
+      const r    = sw.r * Math.pow(1 - frac, 0.65);
+      const bhF  = sw.bh.age / sw.bh.maxAge;
+      const bhEv = Math.max(0, (bhF - 0.92) / 0.08);
+      const rs   = sw.bh.baseRadius * Math.max(0.05, 1 - bhEv * 0.9);
+      if (frac >= 1 || r <= rs) return true;
+      sw.angle += (3 + frac * 10) * dt;
+      obj.x = sw.bh.x + Math.cos(sw.angle) * r;
+      obj.y = sw.bh.y + Math.sin(sw.angle) * r;
+      return false;
+    },
+    applyGravity(obj, dt, { swirlMaxAge = 2.5, gravityK = 1000000, minSwirlR = 4 } = {}) {
+      const allBHs = blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles];
+      if (!allBHs.length) return false;
+      for (const bh of allBHs) {
+        const dx = bh.x - obj.x, dy = bh.y - obj.y;
+        const d  = Math.hypot(dx, dy);
+        if (d < bh.baseRadius * 8) {
+          obj.swirl = { bh, angle: Math.atan2(obj.y - bh.y, obj.x - bh.x), r: Math.max(d, minSwirlR), age: 0, maxAge: swirlMaxAge };
+          return true;
+        }
+        if (d < bh.baseRadius * 30) {
+          const g = gravityK / (d * d);
+          obj.vx += (dx / d) * g * dt;
+          obj.vy += (dy / d) * g * dt;
+        }
+      }
+      return false;
+    },
   };
 })();

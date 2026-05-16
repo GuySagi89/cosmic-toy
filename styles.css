@@ -91,6 +91,9 @@ body {
   z-index: 100;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Desktop: larger slots, same horizontal layout */
@@ -698,54 +701,6 @@ body {
     drop-shadow(0 0 10px rgba(0, 200, 255, 0.50));
 }
 
-/* ── Performance toggle ── */
-.perf-toggle {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(120, 110, 170, 0.28);
-  background: rgba(8, 5, 22, 0.78);
-  color: rgba(150, 135, 195, 0.62);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  z-index: 100;
-  touch-action: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  backdrop-filter: blur(8px);
-  transition: border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .perf-toggle:hover {
-    border-color: rgba(170, 155, 230, 0.48);
-    color: rgba(195, 180, 245, 0.82);
-  }
-}
-
-.perf-toggle.active {
-  border-color: rgba(60, 210, 120, 0.55);
-  color: rgba(80, 235, 145, 0.95);
-  box-shadow: 0 0 10px 2px rgba(30, 180, 90, 0.22);
-}
-
-.perf-toggle-icon {
-  font-size: 12px;
-  line-height: 1;
-}
-
-.perf-toggle-label {
-  line-height: 1;
-}
 
 /* ── Drag origin dot ── */
 .gadget-origin-dot {

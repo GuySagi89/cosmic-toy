@@ -22,6 +22,7 @@
   let lastTrailTime     = null;
   let lastMouseX        = 0;
   let lastMouseY        = 0;
+  let corsairFlashTimer = null;
 
   const CORSAIR_SVG = '<svg viewBox="-24 -24 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle r="20" stroke="#00f5ff" stroke-width="0.8" opacity="0.55"/><line x1="0" y1="-20" x2="0" y2="-9" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="0" y1="9" x2="0" y2="20" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="-20" y1="0" x2="-9" y2="0" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="9" y1="0" x2="20" y2="0" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><path d="M-20,-11 L-20,-20 L-11,-20" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11,-20 L20,-20 L20,-11" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20,11 L20,20 L11,20" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M-11,20 L-20,20 L-20,11" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle r="7" stroke="#ff00bb" stroke-width="1.2"><animate attributeName="opacity" values="1;0.3;1" dur="2.2s" repeatCount="indefinite"/></circle><circle r="1.8" fill="#ff00bb"><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.2s" repeatCount="indefinite"/></circle></svg>';
 
@@ -43,6 +44,7 @@
   document.body.appendChild(corsairEl);
 
   function updateCorsairVisibility(x, y) {
+    if (lastPointerType !== 'mouse') return;
     if (activeGadget) { corsairEl.style.opacity = '0'; return; }
     const over   = document.elementFromPoint(x, y);
     const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle'));
@@ -248,7 +250,20 @@
   }
 
   // Track last real pointer type to avoid treating compat mouse events as genuine mouse input
-  document.addEventListener('pointerdown', e => { lastPointerType = e.pointerType; }, { capture: true });
+  document.addEventListener('pointerdown', e => {
+    lastPointerType = e.pointerType;
+    if (e.pointerType !== 'mouse') {
+      const over   = document.elementFromPoint(e.clientX, e.clientY);
+      const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle'));
+      if (!overUI) {
+        corsairEl.style.left = e.clientX + 'px';
+        corsairEl.style.top  = e.clientY + 'px';
+        corsairEl.style.opacity = '1';
+        clearTimeout(corsairFlashTimer);
+        corsairFlashTimer = setTimeout(() => { corsairEl.style.opacity = '0'; }, 280);
+      }
+    }
+  }, { capture: true });
 
   // Track cursor even when pointer is over inventory (above the overlay)
   document.addEventListener('pointermove', e => {
