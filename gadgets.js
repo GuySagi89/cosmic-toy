@@ -269,10 +269,12 @@
       window.spawnBlackHole && window.spawnBlackHole(e.clientX, e.clientY);
       isDragging = false;
       setActiveGadget('blackhole');
+      e.stopPropagation();
     } else if (activeGadget === 'asteroid') {
       window.Asteroids && window.Asteroids.spawnAt(e.clientX, e.clientY);
       isDragging = false;
       setActiveGadget('asteroid');
+      e.stopPropagation();
     } else if (activeGadget === 'comet') {
       cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
       showDragOrigin(dragStartX, dragStartY, 'comet');
@@ -289,16 +291,6 @@
   function onMove(e) {
     if (activePointerId !== null && e.pointerId !== activePointerId) return;
     moveCursor(e.clientX, e.clientY);
-<<<<<<< Updated upstream
-    if (activeGadget === 'spaceship' && e.pointerType === 'mouse') {
-      const ship = window.Spaceship && window.Spaceship.get();
-      if (ship && !ship.exploding && !ship.swirl) {
-        ship._aimX = e.clientX;
-        ship._aimY = e.clientY;
-      }
-    }
-=======
->>>>>>> Stashed changes
     if (!isDragging) return;
 
     if (activeGadget === 'comet') {
@@ -430,7 +422,7 @@
   });
 
   document.addEventListener('contextmenu', e => {
-    if (activeGadget === 'spaceship') {
+    if (!activeGadget) {
       e.preventDefault();
       window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
     }
@@ -439,4 +431,62 @@
   // Fallback: catch pointer release even when the overlay loses capture (e.g. after contextmenu)
   window.addEventListener('pointerup',     onUp);
   window.addEventListener('pointercancel', onCancel);
+
+  // ── Direct spaceship control (always-on, below any gadget overlay) ──────────
+  {
+    let pendingPointerId = null;
+    let pendingStartX    = 0, pendingStartY = 0;
+    let pendingIsDrag    = false;
+
+    document.body.addEventListener('pointerdown', e => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (activeGadget) return;
+      if (inventory.contains(e.target)) return;
+      if (e.target.closest('#perf-toggle')) return;
+      pendingPointerId = e.pointerId;
+      pendingStartX    = e.clientX;
+      pendingStartY    = e.clientY;
+      pendingIsDrag    = (e.pointerType !== 'touch');
+      if (pendingIsDrag) window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
+    });
+
+    document.body.addEventListener('pointermove', e => {
+      if (!activeGadget && e.pointerType === 'mouse') {
+        const ship = window.Spaceship && window.Spaceship.get();
+        if (ship && !ship.exploding) { ship._aimX = e.clientX; ship._aimY = e.clientY; }
+      }
+      if (e.pointerId !== pendingPointerId || activeGadget) return;
+      if (!pendingIsDrag && Math.hypot(e.clientX - pendingStartX, e.clientY - pendingStartY) > 12) {
+        pendingIsDrag = true;
+        window.startSpaceship && window.startSpaceship(pendingStartX, pendingStartY);
+      }
+      if (pendingIsDrag) window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
+    });
+
+    const endShipControl = e => {
+      if (e.pointerId !== pendingPointerId) return;
+      const wasDrag = pendingIsDrag;
+      pendingPointerId = null;
+      pendingIsDrag    = false;
+      if (activeGadget) return;
+      if (wasDrag) window.releaseSpaceship && window.releaseSpaceship();
+      else if (e.type === 'pointerup' && e.pointerType === 'touch') {
+        window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
+      }
+    };
+    document.body.addEventListener('pointerup',     endShipControl);
+    document.body.addEventListener('pointercancel', endShipControl);
+  }
+
+  // ── Performance mode toggle ───────────────────────────────────────
+  const perfToggle = document.getElementById('perf-toggle');
+  if (perfToggle) {
+    window.perfMode = localStorage.getItem('perfMode') === '1';
+    perfToggle.classList.toggle('active', window.perfMode);
+    perfToggle.addEventListener('click', () => {
+      window.perfMode = !window.perfMode;
+      localStorage.setItem('perfMode', window.perfMode ? '1' : '0');
+      perfToggle.classList.toggle('active', window.perfMode);
+    });
+  }
 })();

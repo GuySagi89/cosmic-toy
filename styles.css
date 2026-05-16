@@ -676,3 +676,57 @@ body {
 }
 
 
+
+/* ── Performance toggle switch ── */
+.perf-toggle {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  z-index: 100;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.perf-toggle-track {
+  display: flex;
+  align-items: center;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 110, 170, 0.35);
+  background: rgba(8, 5, 22, 0.82);
+  backdrop-filter: blur(8px);
+  padding: 2px;
+  box-sizing: border-box;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.perf-toggle-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(150, 135, 195, 0.55);
+  transition: transform 0.25s ease, background 0.25s ease;
+  flex-shrink: 0;
+}
+
+.perf-toggle.active .perf-toggle-track {
+  border-color: rgba(60, 210, 120, 0.60);
+  box-shadow: 0 0 10px 2px rgba(30, 180, 90, 0.25);
+}
+
+.perf-toggle.active .perf-toggle-thumb {
+  background: rgba(80, 235, 145, 0.95);
+  transform: translateX(20px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .perf-toggle:hover .perf-toggle-track {
+    border-color: rgba(170, 155, 230, 0.55);
+  }
+}

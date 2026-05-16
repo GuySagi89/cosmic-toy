@@ -239,6 +239,30 @@
     }
   }
 
+  function computeLandingPos() {
+    const globeEl = document.getElementById('globe-canvas');
+    if (globeEl) {
+      const gr     = globeEl.getBoundingClientRect();
+      const gcx    = gr.left + gr.width  / 2;
+      const gcy    = gr.top  + gr.height / 2;
+      const globeR = gr.width * 0.22;
+      return { x: gcx, y: Math.max(canvas.height * 0.2, gcy - globeR * 2.2) };
+    }
+    return { x: canvas.width / 2, y: canvas.height * 0.38 };
+  }
+
+  function spawnWithIntro() {
+    const pos    = computeLandingPos();
+    const startY = -40;
+    return {
+      x: pos.x, y: startY,
+      targetX: pos.x, targetY: pos.y,
+      vx: 0, vy: 0,
+      angle: 0, active: false, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0,
+      intro: { age: 0, duration: 1.8, startX: pos.x, startY, endX: pos.x, endY: pos.y },
+    };
+  }
+
   function updateSpaceship(dt) {
     for (let i = shipImpacts.length - 1; i >= 0; i--) {
       shipImpacts[i].age += dt;
@@ -313,12 +337,52 @@
       spaceship.x  += spaceship.vx * dt;
       spaceship.y  += spaceship.vy * dt;
       if (spaceship.explodeAge >= spaceship.explodeMaxAge) {
-        spaceship = null;
-        setTimeout(() => {
-          if (spaceship) return;
-          const cx = canvas.width / 2, cy = canvas.height / 2;
-          spaceship = { x: cx, y: cy, targetX: cx, targetY: cy, vx: 0, vy: 0, angle: 0, active: false, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
-        }, 2000);
+        spaceship = spawnWithIntro();
+      }
+      return;
+    }
+
+    if (spaceship.intro) {
+      const intro = spaceship.intro;
+      intro.age += dt;
+      const t    = Math.min(1, intro.age / intro.duration);
+      // quartic ease-out: slams in fast, long deceleration tail like retro-rocket braking
+      const ease = 1 - Math.pow(1 - t, 4);
+      const prevX = spaceship.x, prevY = spaceship.y;
+      spaceship.x     = intro.startX + (intro.endX - intro.startX) * ease;
+      spaceship.y     = intro.startY + (intro.endY - intro.startY) * ease;
+      spaceship.vx    = dt > 0 ? (spaceship.x - prevX) / dt : 0;
+      spaceship.vy    = dt > 0 ? (spaceship.y - prevY) / dt : 0;
+      spaceship.angle = 0;
+      const spd = Math.hypot(spaceship.vx, spaceship.vy);
+      const smokeLimit = window.perfMode ? 60 : 300;
+      if (spd > 25 && window.smokeParticles && window.smokeParticles.length < smokeLimit) {
+        spaceship.emitAccum += dt * (spd / 38) * 60;
+        while (spaceship.emitAccum >= 1) {
+          // Retro-rocket thrust: shoot below the ship, faster than the ship's descent
+          const spread      = (Math.random() - 0.5) * 1.2;
+          const thrustSpeed = 220 + Math.random() * 160;
+          window.smokeParticles.push({
+            x: spaceship.x + (Math.random() - 0.5) * 8,
+            y: spaceship.y + 12,
+            vx: Math.sin(spread) * thrustSpeed * 0.55,
+            vy: spaceship.vy + thrustSpeed,
+            life: 0.5 + Math.random() * 0.35,
+            maxLife: 0.82,
+            r: 4 + Math.random() * 5,
+            core: Math.random() < 0.45,
+          });
+          spaceship.emitAccum--;
+        }
+      }
+      if (t >= 1) {
+        spaceship.intro   = null;
+        spaceship.x       = intro.endX;
+        spaceship.y       = intro.endY;
+        spaceship.vx      = 0;
+        spaceship.vy      = 0;
+        spaceship.targetX = intro.endX;
+        spaceship.targetY = intro.endY;
       }
       return;
     }
@@ -358,7 +422,7 @@
       spaceship.angle = lerpAngle(spaceship.angle, Math.atan2(spaceship.vy, spaceship.vx) + Math.PI / 2, dt * 8);
     }
 
-    if (spd > 25 && window.smokeParticles.length < 300) {
+    if (spd > 25 && window.smokeParticles.length < (window.perfMode ? 60 : 300)) {
       spaceship.emitAccum += dt * (spd / 80) * 60;
       while (spaceship.emitAccum >= 1) { emitSmoke(); spaceship.emitAccum--; }
     }
@@ -672,7 +736,7 @@
     }
 
     ctx.shadowColor = `rgba(${glR}, ${glG}, ${glB}, 0.9)`;
-    ctx.shadowBlur  = 14 + (hits >= 7 ? fl * 28 : 0);
+    ctx.shadowBlur  = window.perfMode ? 0 : 14 + (hits >= 7 ? fl * 28 : 0);
 
     ctx.beginPath();
     ctx.moveTo( 0, -15);
@@ -697,7 +761,7 @@
     ctx.stroke();
 
     ctx.shadowColor = 'rgba(148, 232, 255, 0.9)';
-    ctx.shadowBlur  = 8;
+    ctx.shadowBlur  = window.perfMode ? 0 : 8;
     ctx.beginPath();
     ctx.ellipse(0, -6, 2.5, 5, 0, 0, Math.PI * 2);
     ctx.fillStyle   = 'rgba(172, 238, 255, 0.92)';
@@ -760,7 +824,7 @@
   window.startSpaceship = function(x, y) {
     if (!spaceship) {
       spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
-    } else if (!spaceship.exploding && !spaceship.swirl) {
+    } else if (!spaceship.intro && !spaceship.exploding && !spaceship.swirl) {
       spaceship.targetX = x;
       spaceship.targetY = y;
       spaceship.active  = true;
@@ -771,11 +835,11 @@
     if (spaceship) { spaceship.targetX = x; spaceship.targetY = y; }
   };
   window.releaseSpaceship = function() {
-    if (spaceship) spaceship.active = false;
+    if (spaceship && !spaceship.intro) spaceship.active = false;
   };
 
   window.fireSpaceshipLaser = function(targetX, targetY) {
-    if (!spaceship || spaceship.exploding || spaceship.swirl) return;
+    if (!spaceship || spaceship.intro || spaceship.exploding || spaceship.swirl) return;
     const dx   = targetX - spaceship.x;
     const dy   = targetY - spaceship.y;
     const dist = Math.hypot(dx, dy);
@@ -797,7 +861,7 @@
     get:              () => spaceship,
     triggerExplosion: triggerShipExplosion,
     hit(x, y, vx, vy, damage) {
-      if (!spaceship || spaceship.exploding || spaceship.swirl) return;
+      if (!spaceship || spaceship.intro || spaceship.exploding || spaceship.swirl) return;
       spaceship.hits += damage;
       spawnShipImpact(x, y);
       spawnBounceDebris(x, y, vx, vy);
@@ -806,8 +870,6 @@
   };
 
   window.addEventListener('load', function () {
-    const cx = canvas.width  / 2 || window.innerWidth  / 2;
-    const cy = canvas.height / 2 || window.innerHeight / 2;
-    spaceship = { x: cx, y: cy, targetX: cx, targetY: cy, vx: 0, vy: 0, angle: 0, active: false, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
+    spaceship = spawnWithIntro();
   });
 })();
