@@ -118,11 +118,14 @@
 
         // Swirl into black hole
         if (m.swirl) {
-          const sw = m.swirl;
-          sw.age += dt;
+          const sw   = m.swirl;
+          sw.age    += dt;
           const frac = sw.age / sw.maxAge;
-          if (frac >= 1) { s.meteors.splice(mi, 1); continue; }
-          const r   = sw.r * Math.pow(1 - frac, 0.65);
+          const r    = sw.r * Math.pow(1 - frac, 0.65);
+          const bhF  = sw.bh.age / sw.bh.maxAge;
+          const bhEv = Math.max(0, (bhF - 0.92) / 0.08);
+          const rs   = sw.bh.baseRadius * Math.max(0.05, 1 - bhEv * 0.9);
+          if (frac >= 1 || r <= rs) { s.meteors.splice(mi, 1); continue; }
           sw.angle += (3 + frac * 10) * dt;
           m.x = sw.bh.x + Math.cos(sw.angle) * r;
           m.y = sw.bh.y + Math.sin(sw.angle) * r;
@@ -133,12 +136,12 @@
         for (const bh of allBHs) {
           const dx = bh.x - m.x, dy = bh.y - m.y;
           const d  = Math.hypot(dx, dy);
-          if (d < bh.baseRadius * 3) {
-            m.swirl = { bh, angle: Math.atan2(m.y - bh.y, m.x - bh.x), r: Math.max(d, 4), age: 0, maxAge: 0.75 };
+          if (d < bh.baseRadius * 8) {
+            m.swirl = { bh, angle: Math.atan2(m.y - bh.y, m.x - bh.x), r: Math.max(d, 4), age: 0, maxAge: 1.2 };
             break;
           }
-          if (d < bh.baseRadius * 20) {
-            const g = 18000 / (d * d);
+          if (d < bh.baseRadius * 30) {
+            const g = 1200000 / (d * d);
             m.vx += (dx / d) * g * dt;
             m.vy += (dy / d) * g * dt;
           }

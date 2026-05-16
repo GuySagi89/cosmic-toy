@@ -268,7 +268,6 @@
 
     const allBHs = window.BlackHole ? window.BlackHole.getAll() : [];
     const W = canvas.width, H = canvas.height;
-    const M = 110;
 
     // Asteroid-asteroid collisions
     for (let i = asteroids.length - 1; i >= 1; i--) {
@@ -277,10 +276,11 @@
         if (asteroids[j].dead || asteroids[j].swirl) continue;
         const ai = asteroids[i], aj = asteroids[j];
         const dx = ai.x - aj.x, dy = ai.y - aj.y;
-        const dist = Math.hypot(dx, dy);
-        const minD = (ai.r + aj.r) * 0.75;
+        const dist = Math.hypot(dx, dy) || 1;
+        const nx = dx / dist, ny = dy / dist;
+        // Support-function test: collision when dist < extent of ai toward aj + extent of aj toward ai
+        const minD = support2D(ai, -nx, -ny) + support2D(aj, nx, ny);
         if (dist < minD) {
-          const nx = dx / (dist || 1), ny = dy / (dist || 1);
           const overlap = minD - dist;
           ai.x += nx * overlap * 0.5;
           ai.y += ny * overlap * 0.5;
@@ -317,11 +317,14 @@
 
       // BH swirl animation
       if (a.swirl) {
-        const sw = a.swirl;
-        sw.age += dt;
+        const sw   = a.swirl;
+        sw.age    += dt;
         const frac = sw.age / sw.maxAge;
-        if (frac >= 1) { a.dead = true; continue; }
         const r    = sw.r * Math.pow(1 - frac, 0.65);
+        const bhF  = sw.bh.age / sw.bh.maxAge;
+        const bhEv = Math.max(0, (bhF - 0.92) / 0.08);
+        const rs   = sw.bh.baseRadius * Math.max(0.05, 1 - bhEv * 0.9);
+        if (frac >= 1 || r <= rs) { a.dead = true; continue; }
         sw.angle  += (3 + frac * 10) * dt;
         a.x        = sw.bh.x + Math.cos(sw.angle) * r;
         a.y        = sw.bh.y + Math.sin(sw.angle) * r;
@@ -332,12 +335,12 @@
       for (const bh of allBHs) {
         const dx = bh.x - a.x, dy = bh.y - a.y;
         const d  = Math.hypot(dx, dy);
-        if (d < bh.baseRadius * 3) {
-          a.swirl = { bh, angle: Math.atan2(a.y - bh.y, a.x - bh.x), r: Math.max(d, 6), age: 0, maxAge: 1.4 };
+        if (d < bh.baseRadius * 8) {
+          a.swirl = { bh, angle: Math.atan2(a.y - bh.y, a.x - bh.x), r: Math.max(d, 6), age: 0, maxAge: 2.5 };
           break;
         }
-        if (d < bh.baseRadius * 20) {
-          const g = 12000 / (d * d);
+        if (d < bh.baseRadius * 30) {
+          const g = 1000000 / (d * d);
           a.vx += (dx / d) * g * dt;
           a.vy += (dy / d) * g * dt;
         }
@@ -454,6 +457,18 @@
     // Mild perspective: closer points appear slightly larger
     const persp = 1 + z2 * 0.0008 * scale;
     return [x3 * persp, y3 * persp, z2];
+  }
+
+  // How far asteroid `a` extends in screen-space direction (nx, ny).
+  // Used for asteroid-asteroid collision so the boundary matches the visible 2D silhouette.
+  function support2D(a, nx, ny) {
+    let max = -Infinity;
+    for (const v of a.shape3D.verts) {
+      const p = project(v, a.eulerX, a.eulerY, a.eulerZ, 1);
+      const dot = p[0] * nx + p[1] * ny;
+      if (dot > max) max = dot;
+    }
+    return max;
   }
 
   // Build convex hull of 2D points using gift-wrapping (small N, fast enough).

@@ -316,20 +316,6 @@
       return;
     }
 
-    if (spaceship.swirl) {
-      const sw = spaceship.swirl;
-      sw.age += dt;
-      const frac = sw.age / sw.maxAge;
-      if (frac >= 1) { spaceship = null; return; }
-      const r     = sw.r * Math.pow(1 - frac, 0.65);
-      sw.angle   += (3 + frac * 10) * dt;
-      spaceship.x     = sw.bh.x + Math.cos(sw.angle) * r;
-      spaceship.y     = sw.bh.y + Math.sin(sw.angle) * r;
-      spaceship.angle = sw.angle + Math.PI / 2;
-      spaceship.alpha = 1 - Math.pow(frac, 0.6);
-      return;
-    }
-
     if (spaceship.active) {
       const dx   = spaceship.targetX - spaceship.x;
       const dy   = spaceship.targetY - spaceship.y;
@@ -455,16 +441,6 @@
       spaceship.vy = -spaceship.vy * 0.65;
     }
 
-    const allBHs = window.BlackHole ? window.BlackHole.getAll() : [];
-    for (const bh of allBHs) {
-      const dx = bh.x - spaceship.x, dy = bh.y - spaceship.y;
-      const d  = Math.hypot(dx, dy);
-      if (d < bh.baseRadius * 3) {
-        spaceship.swirl  = { bh, angle: Math.atan2(spaceship.y - bh.y, spaceship.x - bh.x), r: Math.max(d, 5), age: 0, maxAge: 0.9 };
-        spaceship.active = false;
-        break;
-      }
-    }
 
   }
 

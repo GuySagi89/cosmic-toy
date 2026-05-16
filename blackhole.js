@@ -181,16 +181,6 @@
       }
     }
 
-    if (!bh.waveHits.has('spaceship')) {
-      const ship = window.Spaceship && window.Spaceship.get();
-      if (ship && !ship.exploding) {
-        if (waveR >= Math.hypot(bh.x - ship.x, bh.y - ship.y)) {
-          bh.waveHits.add('spaceship');
-          window.Spaceship.triggerExplosion();
-        }
-      }
-    }
-
     if (window.Comet) window.Comet.blastInRadius(bh.x, bh.y, waveR);
     if (window.MeteorShower) window.MeteorShower.blastInRadius(bh.x, bh.y, waveR);
   }
