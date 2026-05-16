@@ -29,7 +29,7 @@
   function rng(a, b) { return a + Math.random() * (b - a); }
 
   const MOBILE_MQ = window.matchMedia('(min-width: 600px) and (min-height: 600px)');
-  function sizeScale() { return MOBILE_MQ.matches ? 1 : 2 / 3; }
+  function sizeScale() { return MOBILE_MQ.matches ? 1 : 0.5; }
 
   // ── 3D Polyhedron Library ─────────────────────────────────────────
   // Each shape: { verts: [[x,y,z], ...], edges: [[i,j], ...] }
