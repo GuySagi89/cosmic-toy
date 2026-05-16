@@ -296,10 +296,10 @@ body {
 
 /* ── Comet slot ── */
 #gadget-comet {
-  background: radial-gradient(circle at 45% 30%, #001a3a 0%, #000814 55%);
+  background: radial-gradient(circle at 45% 30%, #001730 0%, #000610 55%);
   box-shadow:
-    0 0 0 1px rgba(120, 220, 255, 0.40),
-    0 0 14px 4px rgba(60, 180, 255, 0.45),
+    0 0 0 1px rgba(180, 242, 255, 0.45),
+    0 0 14px 4px rgba(110, 195, 255, 0.42),
     inset 0 0 10px rgba(0, 0, 0, 0.90);
   position: relative;
   transition: box-shadow 0.22s ease;
@@ -307,16 +307,16 @@ body {
 @media (hover: hover) and (pointer: fine) {
   #gadget-comet:hover {
     box-shadow:
-      0 0 0 1px rgba(160, 235, 255, 0.65),
-      0 0 22px 7px rgba(80, 210, 255, 0.70),
+      0 0 0 1px rgba(210, 250, 255, 0.72),
+      0 0 22px 7px rgba(155, 225, 255, 0.70),
       inset 0 0 10px rgba(0, 0, 0, 0.90);
   }
 }
 
 #gadget-comet.active {
   box-shadow:
-    0 0 0 2px rgba(180, 245, 255, 0.95),
-    0 0 30px 12px rgba(80, 210, 255, 0.90),
+    0 0 0 2px rgba(225, 253, 255, 0.95),
+    0 0 30px 12px rgba(155, 225, 255, 0.90),
     inset 0 0 10px rgba(0, 0, 0, 0.90);
 }
 #gadget-comet::before {
@@ -325,8 +325,8 @@ body {
   top: 22%; left: 68%;
   width: calc(var(--slot-size) * 0.20); height: calc(var(--slot-size) * 0.20);
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 6px 3px rgba(160, 230, 255, 0.8);
+  background: #ecfaff;
+  box-shadow: 0 0 6px 3px rgba(195, 242, 255, 0.88);
   pointer-events: none;
 }
 #gadget-comet::after {
@@ -334,7 +334,7 @@ body {
   position: absolute;
   top: 30%; left: 55%;
   width: 3px; height: 60%;
-  background: linear-gradient(to bottom, rgba(180, 240, 255, 0.9), transparent);
+  background: linear-gradient(to bottom, rgba(210, 250, 255, 0.92), transparent);
   border-radius: 2px;
   transform: rotate(-40deg) translateX(-50%);
   pointer-events: none;
@@ -520,10 +520,10 @@ body {
 }
 
 .gadget-cursor--comet {
-  background: radial-gradient(circle at 45% 30%, #001a3a 0%, #000814 55%);
+  background: radial-gradient(circle at 45% 30%, #001730 0%, #000610 55%);
   box-shadow:
-    0 0 0 1.5px rgba(120, 220, 255, 0.75),
-    0 0 14px 6px rgba(60, 180, 255, 0.68),
+    0 0 0 1.5px rgba(180, 242, 255, 0.82),
+    0 0 14px 6px rgba(110, 195, 255, 0.72),
     inset 0 0 8px rgba(0, 0, 0, 0.90);
 }
 
@@ -533,8 +533,8 @@ body {
   top: 22%; left: 68%;
   width: 18%; height: 18%;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 4px 2px rgba(160, 230, 255, 0.80);
+  background: #ecfaff;
+  box-shadow: 0 0 4px 2px rgba(195, 242, 255, 0.88);
   pointer-events: none;
 }
 
@@ -543,7 +543,7 @@ body {
   position: absolute;
   top: 30%; left: 55%;
   width: 3px; height: 55%;
-  background: linear-gradient(to bottom, rgba(180, 240, 255, 0.9), transparent);
+  background: linear-gradient(to bottom, rgba(210, 250, 255, 0.92), transparent);
   border-radius: 2px;
   transform: rotate(-40deg) translateX(-50%);
   pointer-events: none;

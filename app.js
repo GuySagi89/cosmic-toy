@@ -737,7 +737,8 @@
 
     // Moon solid boundary
     if (window.getMoonScreenPos) {
-      const m     = window.getMoonScreenPos();
+      const m = window.getMoonScreenPos();
+      if (m) {
       const bdx   = spaceship.x - m.x, bdy = spaceship.y - m.y;
       const bdist = Math.hypot(bdx, bdy);
       if (bdist < m.r + 8) {
@@ -761,6 +762,7 @@
           spaceship.vx -= dot * nx;
           spaceship.vy -= dot * ny;
         }
+      }
       }
     }
 

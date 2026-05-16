@@ -3,8 +3,9 @@
   const canvas = document.getElementById('stars-canvas');
   const ctx    = canvas.getContext('2d');
 
-  let comets     = [];
-  let explosions = [];
+  let comets      = [];
+  let explosions  = [];
+  let freezeRings = [];
 
   function spawnImpactDebris(x, y, vx, vy) {
     const spd  = Math.hypot(vx, vy) || 1;
@@ -62,7 +63,70 @@
     explosions.push({ x, y, age: 0, maxAge: 0.65 });
   }
 
+  function spawnFreezeRing(x, y) {
+    freezeRings.push({ x, y, r: 0, maxR: 180, speed: 480, fadingOut: false, fadeAge: 0, maxFadeAge: 0.30 });
+  }
+
+  function spawnFreezeExplosion(x, y) {
+    explosions.push({ x, y, age: 0, maxAge: 0.80, freeze: true });
+    if (!window.smokeParticles) return;
+    for (let i = 0; i < 45; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd   = 60 + Math.random() * 300;
+      const ml    = 0.35 + Math.random() * 0.55;
+      window.smokeParticles.push({
+        x: x + (Math.random() - 0.5) * 10,
+        y: y + (Math.random() - 0.5) * 10,
+        vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
+        life: ml, maxLife: ml,
+        r: 2.5 + Math.random() * 6,
+        core: Math.random() < 0.4, ice: true,
+      });
+    }
+  }
+
+  function drawFreezeExplosion(exp, gs = 1) {
+    const frac = exp.age / exp.maxAge;
+
+    if (frac < 0.38) {
+      const f2 = frac / 0.38;
+      const r  = ((1 - f2) * 52 + 6) * gs;
+      const fg = ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, r);
+      fg.addColorStop(0,    `rgba(255,255,255,${(1 - f2) * 0.95})`);
+      fg.addColorStop(0.30, `rgba(200,248,255,${(1 - f2) * 0.72})`);
+      fg.addColorStop(1,    'rgba(80,180,255,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(exp.x, exp.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, (1 - frac) * 0.90);
+    ctx.strokeStyle = frac < 0.50 ? 'rgba(235,252,255,1)' : 'rgba(140,215,255,0.85)';
+    ctx.lineWidth   = ((1 - frac) * 3.5 + 0.4) * gs;
+    ctx.shadowColor = 'rgba(160,230,255,0.8)';
+    ctx.shadowBlur  = 20 * (1 - frac) * gs;
+    ctx.beginPath();
+    ctx.arc(exp.x, exp.y, Math.max(0.5, frac * 105 * gs), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    if (frac > 0.10) {
+      const f2 = (frac - 0.10) / 0.90;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, (1 - f2) * 0.58);
+      ctx.strokeStyle = 'rgba(185,238,255,0.9)';
+      ctx.lineWidth   = ((1 - f2) * 2.2 + 0.3) * gs;
+      ctx.beginPath();
+      ctx.arc(exp.x, exp.y, Math.max(0.5, f2 * 68 * gs), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function drawExplosion(exp, gs = 1) {
+    if (exp.freeze) { drawFreezeExplosion(exp, gs); return; }
     const frac = exp.age / exp.maxAge;
 
     if (frac < 0.5) {
@@ -114,6 +178,18 @@
     for (let i = explosions.length - 1; i >= 0; i--) {
       explosions[i].age += dt;
       if (explosions[i].age >= explosions[i].maxAge) explosions.splice(i, 1);
+    }
+
+    for (let i = freezeRings.length - 1; i >= 0; i--) {
+      const ring = freezeRings[i];
+      if (!ring.fadingOut) {
+        ring.r = Math.min(ring.maxR, ring.r + ring.speed * dt);
+        if (window.Asteroids) window.Asteroids.freezeInRadius(ring.x, ring.y, ring.r);
+        if (ring.r >= ring.maxR) ring.fadingOut = true;
+      } else {
+        ring.fadeAge += dt;
+        if (ring.fadeAge >= ring.maxFadeAge) freezeRings.splice(i, 1);
+      }
     }
 
     const allBHs  = window.BlackHole ? window.BlackHole.getAll() : [];
@@ -193,7 +269,7 @@
             maxLife: 0.55,
             r: 2.5 + Math.random() * 3.5,
             core: Math.random() < 0.4,
-            comet: true,
+            ice: true,
           });
         }
       }
@@ -210,6 +286,7 @@
           window.dispatchEvent(new CustomEvent('comet-globe-impact',
             { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
           spawnImpactDebris(c.x, c.y, c.vx, c.vy);
+          spawnFreezeRing(c.x, c.y);
           comets.splice(i, 1); continue;
         }
       }
@@ -218,12 +295,13 @@
         window.dispatchEvent(new CustomEvent('comet-moon-impact',
           { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));
         spawnImpactDebris(c.x, c.y, c.vx, c.vy);
+        spawnFreezeRing(c.x, c.y);
         comets.splice(i, 1); continue;
       }
 
-
-      if (window.Asteroids && window.Asteroids.checkHit(c.x, c.y, 18, 1)) {
-        spawnExplosion(c.x, c.y);
+      if (window.Asteroids && window.Asteroids.touchAny(c.x, c.y, 18)) {
+        spawnFreezeRing(c.x, c.y);
+        spawnFreezeExplosion(c.x, c.y);
         comets.splice(i, 1); continue;
       }
     }
@@ -231,6 +309,41 @@
 
   function drawComet() {
     const gs = window.gadgetScale || 1;
+
+    for (const ring of freezeRings) {
+      if (ring.r < 1) continue;
+      const alpha = ring.fadingOut ? Math.max(0, 1 - ring.fadeAge / ring.maxFadeAge) : 1;
+
+      ctx.save();
+      // Broad ice-blue glow body
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.strokeStyle = 'rgba(130, 220, 255, 1)';
+      ctx.lineWidth   = 14 * gs;
+      ctx.shadowColor = 'rgba(180, 240, 255, 1)';
+      ctx.shadowBlur  = 28 * gs;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+      ctx.stroke();
+      // Mid ring
+      ctx.globalAlpha = alpha * 0.80;
+      ctx.strokeStyle = 'rgba(200, 245, 255, 1)';
+      ctx.lineWidth   = 5 * gs;
+      ctx.shadowBlur  = 14 * gs;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+      ctx.stroke();
+      // Sharp bright leading edge
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = 'rgba(245, 255, 255, 1)';
+      ctx.lineWidth   = 1.5 * gs;
+      ctx.shadowColor = 'rgba(220, 250, 255, 1)';
+      ctx.shadowBlur  = 8 * gs;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     for (const exp of explosions) drawExplosion(exp, gs);
     for (const c of comets) {
       if (c.swirl) {
@@ -263,9 +376,9 @@
       const tx = c.x - nx * tailLen, ty = c.y - ny * tailLen;
 
       const tailGrad = ctx.createLinearGradient(c.x, c.y, tx, ty);
-      tailGrad.addColorStop(0,   'rgba(220, 240, 255, 0.95)');
-      tailGrad.addColorStop(0.3, 'rgba(100, 220, 255, 0.60)');
-      tailGrad.addColorStop(1,   'rgba(60, 140, 255, 0)');
+      tailGrad.addColorStop(0,   'rgba(240, 252, 255, 0.95)');
+      tailGrad.addColorStop(0.3, 'rgba(175, 235, 255, 0.62)');
+      tailGrad.addColorStop(1,   'rgba(100, 195, 255, 0)');
       ctx.strokeStyle = tailGrad;
       ctx.lineWidth   = 10 * gs;
       ctx.lineCap     = 'round';
@@ -274,16 +387,32 @@
       ctx.lineTo(tx, ty);
       ctx.stroke();
 
-      ctx.shadowColor = 'rgba(160, 240, 255, 1)';
+      ctx.shadowColor = 'rgba(210, 248, 255, 1)';
       ctx.shadowBlur  = 50 * gs;
-      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 26 * gs);
-      coreGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
-      coreGrad.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
-      coreGrad.addColorStop(1,   'rgba(60, 160, 255, 0)');
+      const coreR    = 26 * gs;
+      const coreGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, coreR);
+      coreGrad.addColorStop(0,   'rgba(240, 255, 255, 1)');
+      coreGrad.addColorStop(0.4, 'rgba(180, 242, 255, 0.88)');
+      coreGrad.addColorStop(1,   'rgba(90, 185, 255, 0)');
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
-      ctx.arc(c.x, c.y, 26 * gs, 0, Math.PI * 2);
+      ctx.arc(c.x, c.y, coreR, 0, Math.PI * 2);
       ctx.fill();
+
+      // Crystal sparkle arms
+      ctx.globalAlpha = 0.70;
+      ctx.strokeStyle = 'rgba(225, 252, 255, 0.90)';
+      ctx.lineWidth   = 1.2 * gs;
+      ctx.shadowBlur  = 10 * gs;
+      for (let k = 0; k < 4; k++) {
+        const ang = (k / 4) * Math.PI + (spd * 0.0008);
+        const len = 18 * gs;
+        ctx.beginPath();
+        ctx.moveTo(c.x - Math.cos(ang) * len, c.y - Math.sin(ang) * len);
+        ctx.lineTo(c.x + Math.cos(ang) * len, c.y + Math.sin(ang) * len);
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
   }

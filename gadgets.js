@@ -41,7 +41,7 @@
     dragPath = [{ x, y, t: performance.now() }];
 
     const NS     = 'http://www.w3.org/2000/svg';
-    const color  = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
+    const color  = type === 'comet' ? 'rgba(220,250,255,1)' : 'rgba(255,200,80,1)';
     const gradId = `drag-trail-${type}`;
 
     svgEl = document.createElementNS(NS, 'svg');
@@ -124,7 +124,7 @@
   function spawnThrowParticles(x, y, type) {
     if (!svgEl) return;
     const NS    = 'http://www.w3.org/2000/svg';
-    const color = type === 'comet' ? 'rgba(160,235,255,1)' : 'rgba(255,200,80,1)';
+    const color = type === 'comet' ? 'rgba(220,250,255,1)' : 'rgba(255,200,80,1)';
     const count = 7;
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.6;
@@ -167,7 +167,7 @@
           maxLife: 0.55,
           r: 2.5 + Math.random() * 3.5,
           core: Math.random() < 0.4,
-          comet: true,
+          ice: true,
         });
       }
     }

@@ -46,7 +46,7 @@
 
   let moonOrbitAngle   = 0;
   let moonSelfAngle    = 0;
-  let moonOrbitSpeed   = MOON_ORBIT_SPEED;
+  let moonOrbitSpeed   = 0;
   let moonDeployed     = false;
   let moonFrostPatches = [];
   let moonFreezeEnd   = 0;   // ms timestamp when freeze ends; 0 = not frozen
@@ -286,7 +286,7 @@ function drawOrbitRing() {
   document.addEventListener('DOMContentLoaded', init);
 
   window.getMoonScreenPos = function () {
-    if (!canvas) return null;
+    if (!canvas || !moonDeployed) return null;
     const m    = getMoonPos();
     const rect = canvas.getBoundingClientRect();
     const scl  = rect.width / W;
@@ -319,6 +319,6 @@ function drawOrbitRing() {
     getPos()        { return getMoonPos(); },
     isDeployed()    { return moonDeployed; },
     deploy()        { moonDeployed = true; },
-    undeploy()      { moonDeployed = false; moonOrbitAngle = 0; moonOrbitSpeed = MOON_ORBIT_SPEED; },
+    undeploy()      { moonDeployed = false; moonOrbitAngle = 0; moonOrbitSpeed = 0; },
   };
 })();

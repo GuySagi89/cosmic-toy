@@ -392,30 +392,32 @@
     }
 
     if (window.getMoonScreenPos) {
-      const m     = window.getMoonScreenPos();
-      const bdx   = spaceship.x - m.x, bdy = spaceship.y - m.y;
-      const bdist = Math.hypot(bdx, bdy);
-      if (bdist < m.r + 8) {
-        const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
-        spaceship.x = m.x + nx * (m.r + 8);
-        spaceship.y = m.y + ny * (m.r + 8);
-        const dot = spaceship.vx * nx + spaceship.vy * ny;
-        if (spaceship.bounceCD <= 0) {
-          if (dot < 0) {
-            const inVx = spaceship.vx, inVy = spaceship.vy;
-            spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
-            spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
-            spawnBounceDebris(spaceship.x, spaceship.y, inVx, inVy);
-            spawnShipImpact(spaceship.x, spaceship.y);
-            window.dispatchEvent(new CustomEvent('comet-moon-impact',
-              { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
-            spaceship.hits++;
-            if (spaceship.hits >= 20) triggerShipExplosion();
+      const m = window.getMoonScreenPos();
+      if (m) {
+        const bdx   = spaceship.x - m.x, bdy = spaceship.y - m.y;
+        const bdist = Math.hypot(bdx, bdy);
+        if (bdist < m.r + 8) {
+          const nx  = bdx / (bdist || 1), ny = bdy / (bdist || 1);
+          spaceship.x = m.x + nx * (m.r + 8);
+          spaceship.y = m.y + ny * (m.r + 8);
+          const dot = spaceship.vx * nx + spaceship.vy * ny;
+          if (spaceship.bounceCD <= 0) {
+            if (dot < 0) {
+              const inVx = spaceship.vx, inVy = spaceship.vy;
+              spaceship.vx = (spaceship.vx - 2 * dot * nx) * 0.65;
+              spaceship.vy = (spaceship.vy - 2 * dot * ny) * 0.65;
+              spawnBounceDebris(spaceship.x, spaceship.y, inVx, inVy);
+              spawnShipImpact(spaceship.x, spaceship.y);
+              window.dispatchEvent(new CustomEvent('comet-moon-impact',
+                { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
+              spaceship.hits++;
+              if (spaceship.hits >= 20) triggerShipExplosion();
+            }
+            spaceship.bounceCD = 0.5;
+          } else if (dot < 0) {
+            spaceship.vx -= dot * nx;
+            spaceship.vy -= dot * ny;
           }
-          spaceship.bounceCD = 0.5;
-        } else if (dot < 0) {
-          spaceship.vx -= dot * nx;
-          spaceship.vy -= dot * ny;
         }
       }
     }

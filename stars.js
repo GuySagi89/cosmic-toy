@@ -316,7 +316,11 @@
       const alpha = (p.life / p.maxLife) * (p.core ? 0.78 : 0.48);
       const r     = Math.max(0.01, p.r * (1 + frac * 2.8));
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-      if (p.comet) {
+      if (p.ice) {
+        g.addColorStop(0,   `rgba(222, 248, 255, ${alpha})`);
+        g.addColorStop(0.4, `rgba(140, 215, 255, ${alpha * 0.55})`);
+        g.addColorStop(1,   'rgba(60, 148, 220, 0)');
+      } else if (p.comet) {
         g.addColorStop(0,   `rgba(180, 240, 255, ${alpha})`);
         g.addColorStop(0.4, `rgba(80,  180, 255, ${alpha * 0.45})`);
         g.addColorStop(1,   'rgba(20, 80, 200, 0)');

@@ -155,6 +155,10 @@
       bounceCD: 0,
       swirl:    null,
       dead:     false,
+      frozen:   0,
+      frozenVx: 0,
+      frozenVy: 0,
+      thaw:     null,
     };
   }
 
@@ -312,11 +316,28 @@
       a.hitFlash = Math.max(0, a.hitFlash - dt);
       a.glowPh   = (a.glowPh + dt * 1.7) % (Math.PI * 2);
 
-      // Advance 3D Euler angles
-      a.eulerX = (a.eulerX + a.eulerSpd.x * dt) % (Math.PI * 2);
-      a.eulerY = (a.eulerY + a.eulerSpd.y * dt) % (Math.PI * 2);
-      a.eulerZ = (a.eulerZ + a.eulerSpd.z * dt) % (Math.PI * 2);
-      a.rotation = a.eulerZ; // keep in sync for any external code that reads it
+      if (a.frozen > 0) {
+        a.frozen = Math.max(0, a.frozen - dt);
+        if (a.frozen === 0) {
+          a.thaw = { age: 0, maxAge: 1.5, vx: a.frozenVx, vy: a.frozenVy };
+        }
+        continue;
+      }
+
+      // Spin and velocity ramp during thaw; full speed otherwise
+      let spinFrac = 1;
+      if (a.thaw) {
+        a.thaw.age += dt;
+        const tf = Math.min(1, a.thaw.age / a.thaw.maxAge);
+        spinFrac = tf;
+        a.vx = a.thaw.vx * tf;
+        a.vy = a.thaw.vy * tf;
+        if (tf >= 1) a.thaw = null;
+      }
+      a.eulerX = (a.eulerX + a.eulerSpd.x * spinFrac * dt) % (Math.PI * 2);
+      a.eulerY = (a.eulerY + a.eulerSpd.y * spinFrac * dt) % (Math.PI * 2);
+      a.eulerZ = (a.eulerZ + a.eulerSpd.z * spinFrac * dt) % (Math.PI * 2);
+      a.rotation = a.eulerZ;
 
       // BH swirl animation
       if (a.swirl) {
@@ -508,11 +529,12 @@
   function drawAsteroid(a) {
     if (a.dead) return;
 
-    const nc      = NEON[a.ci];
-    const glow    = 0.5 + Math.sin(a.glowPh) * 0.25;
-    const hitFrac = Math.min(1, a.hitFlash / 0.22);
-    const swFrac  = a.swirl ? Math.max(0, 1 - Math.pow(a.swirl.age / a.swirl.maxAge, 0.55)) : 1;
-    const scale   = swFrac;
+    const nc       = NEON[a.ci];
+    const glow     = 0.5 + Math.sin(a.glowPh) * 0.25;
+    const hitFrac  = Math.min(1, a.hitFlash / 0.22);
+    const swFrac   = a.swirl ? Math.max(0, 1 - Math.pow(a.swirl.age / a.swirl.maxAge, 0.55)) : 1;
+    const scale    = swFrac;
+    const isFrozen = a.frozen > 0;
 
     // Project all 3D vertices to 2D (local space, asteroid centered at origin)
     const verts3D = a.shape3D.verts;
@@ -537,7 +559,17 @@
     }
     ctx.closePath();
 
-    if (hitFrac > 0) {
+    if (isFrozen) {
+      const iceGrad = ctx.createRadialGradient(
+        -a.r * 0.20, -a.r * 0.25, 0,
+         a.r * 0.05,  a.r * 0.05, a.r * 1.10
+      );
+      iceGrad.addColorStop(0,    'rgba(215, 245, 255, 0.82)');
+      iceGrad.addColorStop(0.45, 'rgba(120, 195, 235, 0.70)');
+      iceGrad.addColorStop(1,    'rgba(20,  70, 120, 0.88)');
+      ctx.fillStyle = iceGrad;
+      ctx.fill();
+    } else if (hitFrac > 0) {
       const fr = Math.round(nc.r + (255 - nc.r) * hitFrac);
       const fg = Math.round(nc.g + (255 - nc.g) * hitFrac);
       const fb = Math.round(nc.b + (255 - nc.b) * hitFrac);
@@ -617,10 +649,11 @@
         glw   = 0;
       }
 
-      ctx.shadowColor = nc.hex;
+      const edgeHex   = isFrozen ? '#c8ebff' : nc.hex;
+      ctx.shadowColor = edgeHex;
       ctx.shadowBlur  = glw;
       ctx.globalAlpha = alpha;
-      ctx.strokeStyle = hitFrac > 0.55 ? '#ffffff' : nc.hex;
+      ctx.strokeStyle = !isFrozen && hitFrac > 0.55 ? '#ffffff' : edgeHex;
       ctx.lineWidth   = lw + hitFrac * 1.2;
       ctx.lineCap     = 'round';
       ctx.beginPath();
@@ -631,6 +664,25 @@
 
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+
+    // Frost shimmer rings when frozen
+    if (isFrozen) {
+      const shimmer = 0.20 + Math.sin(a.glowPh * 2.8) * 0.08;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(210, 248, 255, 0.85)';
+      ctx.lineWidth   = 0.7;
+      ctx.shadowColor = 'rgba(180, 235, 255, 1)';
+      ctx.shadowBlur  = 7;
+      for (let k = 0; k < 3; k++) {
+        const kr = a.r * (0.28 + k * 0.24);
+        ctx.globalAlpha = shimmer * (1 - k * 0.28);
+        ctx.beginPath();
+        ctx.arc(0, 0, kr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
 
   }
@@ -678,7 +730,28 @@
     draw,
     spawnAt(x, y, tier) { asteroids.push(createAsteroid(x, y, tier || 'large')); },
     checkHit,
+    touchAny(x, y, r) {
+      for (const a of asteroids) {
+        if (a.dead || a.swirl) continue;
+        if (Math.hypot(x - a.x, y - a.y) < a.r + r) return true;
+      }
+      return false;
+    },
     getAll: () => asteroids,
+    freezeInRadius(cx, cy, r) {
+      for (const a of asteroids) {
+        if (a.dead || a.swirl || a.frozen > 0) continue;
+        if (Math.hypot(a.x - cx, a.y - cy) <= r + a.r) {
+          a.frozenVx = a.vx;
+          a.frozenVy = a.vy;
+          a.frozen   = 5.0;
+          a.hitFlash = 0;
+          a.thaw     = null;
+          a.vx = 0;
+          a.vy = 0;
+        }
+      }
+    },
     bhExplode(cx, cy, pullR) {
       for (let i = asteroids.length - 1; i >= 0; i--) {
         const a = asteroids[i];
