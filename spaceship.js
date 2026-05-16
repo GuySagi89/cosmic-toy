@@ -379,7 +379,7 @@
             window.dispatchEvent(new CustomEvent('comet-globe-impact',
               { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy, source: 'spaceship' } }));
             spaceship.hits++;
-            if (spaceship.hits >= 10) triggerShipExplosion();
+            if (spaceship.hits >= 20) triggerShipExplosion();
           }
           spaceship.bounceCD = 0.5;
         } else if (dot < 0) {
@@ -408,7 +408,7 @@
             window.dispatchEvent(new CustomEvent('comet-moon-impact',
               { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
             spaceship.hits++;
-            if (spaceship.hits >= 10) triggerShipExplosion();
+            if (spaceship.hits >= 20) triggerShipExplosion();
           }
           spaceship.bounceCD = 0.5;
         } else if (dot < 0) {
@@ -607,12 +607,12 @@
     }
 
     const hits    = spaceship.hits;
-    const hitFrac = Math.min(hits / 9, 1);
+    const hitFrac = Math.min(hits / 19, 1);
     const now     = Date.now();
     const cl = (a, b, t) => Math.round(a + (b - a) * t);
     let fl = 0, warnFreq = 0;
-    if (hits >= 7) {
-      warnFreq = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 7), 2)];
+    if (hits >= 14) {
+      warnFreq = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 14), 2)];
       fl = (Math.sin(now / 1000 * warnFreq * Math.PI * 2) + 1) / 2;
     }
     const topR = cl(cl(192, 255, hitFrac), 255, fl * 0.92);
@@ -638,7 +638,7 @@
 
     if (hits >= 7 && !spaceship.swirl) {
       const period   = 1000 / warnFreq;
-      const maxRingR = 55 + (hits - 7) * 14;
+      const maxRingR = 55 + (hits - 14) * 14;
       ctx.save();
       for (let ri = 0; ri < 2; ri++) {
         const phase  = ((now + ri * period * 0.5) % period) / period;
@@ -702,7 +702,7 @@
 
     // Health bar — screen-aligned, below the ship
     if (!spaceship.exploding && !spaceship.swirl && spaceship.alpha > 0.05) {
-      const health = Math.max(0, (10 - spaceship.hits) / 10);
+      const health = Math.max(0, (20 - spaceship.hits) / 20);
       const gs2    = window.gadgetScale || 1;
       const BAR_W  = 36 * gs2, BAR_H = 4 * gs2;
       const bx     = spaceship.x - BAR_W / 2;
@@ -731,7 +731,7 @@
 
         let barAlpha = 0.92;
         if (health <= 0.3 && hits >= 7) {
-          const pf = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 7), 2)];
+          const pf = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 14), 2)];
           barAlpha  = 0.60 + ((Math.sin(Date.now() / 1000 * pf * Math.PI * 2) + 1) / 2) * 0.40;
         }
 
@@ -792,7 +792,7 @@
       spaceship.hits += damage;
       spawnShipImpact(x, y);
       spawnBounceDebris(x, y, vx, vy);
-      if (spaceship.hits >= 10) triggerShipExplosion();
+      if (spaceship.hits >= 20) triggerShipExplosion();
     },
   };
 })();
