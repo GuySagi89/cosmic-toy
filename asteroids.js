@@ -1,4 +1,6 @@
 // ── Asteroids ─────────────────────────────────────────────────────
+// Visual: rotating 3D wireframe polyhedra with inner detail patterns.
+// Gameplay/physics: unchanged from previous version.
 (function () {
   const canvas = document.getElementById('stars-canvas');
   if (!canvas) return;
@@ -14,11 +16,11 @@
     { hex: '#ff6b00', r: 255, g: 107, b:   0, fill: 'rgba(30,14,0,0.90)'   }, // neon orange
   ];
 
-  // Size tiers: rMin/rMax in px, hp, vertex count range, drift speed range
+  // Size tiers
   const TIERS = {
-    large:  { rMin: 54, rMax: 72, hp: 3, vMin: 8,  vMax: 11, sMin: 22, sMax: 46, splits: 'medium', splitN: 2    },
-    medium: { rMin: 27, rMax: 41, hp: 2, vMin: 6,  vMax:  9, sMin: 38, sMax: 68, splits: 'small',  splitN: [2,3] },
-    small:  { rMin: 13, rMax: 21, hp: 1, vMin: 5,  vMax:  7, sMin: 58, sMax: 95, splits: null                   },
+    large:  { rMin: 54, rMax: 72, hp: 3, sMin: 22, sMax: 46, splits: 'medium', splitN: 2    },
+    medium: { rMin: 27, rMax: 41, hp: 2, sMin: 38, sMax: 68, splits: 'small',  splitN: [2,3] },
+    small:  { rMin: 13, rMax: 21, hp: 1, sMin: 58, sMax: 95, splits: null                   },
   };
 
   let asteroids = [];
@@ -26,36 +28,83 @@
 
   function rng(a, b) { return a + Math.random() * (b - a); }
 
-  // Pre-generate random crack lines in local space (clipped to polygon at draw time)
-  function makeCracks(count, r) {
-    const lines = [];
-    for (let i = 0; i < count; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const len = rng(r * 0.18, r * 0.55);
-      const ox  = rng(-r * 0.42, r * 0.42);
-      const oy  = rng(-r * 0.42, r * 0.42);
-      lines.push({ x1: ox, y1: oy, x2: ox + Math.cos(ang) * len, y2: oy + Math.sin(ang) * len });
+  // ── 3D Polyhedron Library ─────────────────────────────────────────
+  // Each shape: { verts: [[x,y,z], ...], edges: [[i,j], ...] }
+  // All vertices normalized so the furthest sits at radius 1.
+
+  function normalizeVerts(verts) {
+    let maxR = 0;
+    for (const v of verts) {
+      const r = Math.hypot(v[0], v[1], v[2]);
+      if (r > maxR) maxR = r;
     }
-    return lines;
+    if (maxR === 0) return verts;
+    return verts.map(v => [v[0]/maxR, v[1]/maxR, v[2]/maxR]);
   }
 
-  // Generate an irregular polygon with n vertices and nominal radius r
-  function makeShape(n, r) {
-    const step = (Math.PI * 2) / n;
-    const pts  = [];
-    for (let i = 0; i < n; i++) {
-      const baseAng = step * i;
-      const jitter  = (Math.random() - 0.5) * step * 0.68;
-      const rr      = r * rng(0.62, 1.14);
-      pts.push([Math.cos(baseAng + jitter) * rr, Math.sin(baseAng + jitter) * rr]);
+  // ── Lumpy 3D rock generator ───────────────────────────────────────
+  // Base: icosahedron (12 verts, 20 triangular faces, 30 edges).
+  // Each asteroid jitters each vertex along its outward direction by a
+  // random amount, AND adds small lateral wobble. Result: irregular,
+  // chunky, asymmetric — reads as "rock" not "math solid".
+
+  const BASE_ICOSA_VERTS = (() => {
+    const phi = (1 + Math.sqrt(5)) / 2;
+    return normalizeVerts([
+      [-1,  phi, 0], [ 1,  phi, 0], [-1, -phi, 0], [ 1, -phi, 0],
+      [ 0, -1,  phi], [ 0,  1,  phi], [ 0, -1, -phi], [ 0,  1, -phi],
+      [ phi, 0, -1], [ phi, 0,  1], [-phi, 0, -1], [-phi, 0,  1],
+    ]);
+  })();
+
+  // The 20 triangular faces of the icosahedron
+  const BASE_ICOSA_FACES = [
+    [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+    [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+    [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+    [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1],
+  ];
+
+  // Unique edges derived from those faces
+  const BASE_ICOSA_EDGES = (() => {
+    const seen = new Set();
+    const edges = [];
+    for (const f of BASE_ICOSA_FACES) {
+      for (let k = 0; k < 3; k++) {
+        const a = f[k], b = f[(k + 1) % 3];
+        const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          edges.push([Math.min(a, b), Math.max(a, b)]);
+        }
+      }
     }
-    return pts;
+    return edges;
+  })();
+
+  // Generate a unique lumpy rock shape at given radius.
+  // `lumpiness` ∈ [0,1] roughly: 0 = perfect icosahedron, 1 = very chunky.
+  function makeRockShape(r, lumpiness) {
+    const verts = BASE_ICOSA_VERTS.map(v => {
+      // Radial scale: each vertex gets a random radius multiplier
+      const radial = 1 + (Math.random() - 0.5) * lumpiness;
+      // Lateral wobble: small tangential offset, breaks rotational symmetry
+      const wob = lumpiness * 0.22;
+      const wx = (Math.random() - 0.5) * wob;
+      const wy = (Math.random() - 0.5) * wob;
+      const wz = (Math.random() - 0.5) * wob;
+      return [
+        (v[0] * radial + wx) * r,
+        (v[1] * radial + wy) * r,
+        (v[2] * radial + wz) * r,
+      ];
+    });
+    return { verts, edges: BASE_ICOSA_EDGES };
   }
 
   function createAsteroid(x, y, tier, vx, vy) {
     const t  = TIERS[tier];
     const r  = rng(t.rMin, t.rMax);
-    const n  = t.vMin + Math.floor(Math.random() * (t.vMax - t.vMin + 1));
     const ci = Math.floor(Math.random() * NEON.length);
 
     let avx = vx, avy = vy;
@@ -66,20 +115,37 @@
       avy = Math.sin(ang) * spd;
     }
 
+    // Slower base spin since 3D rotation is more visually busy
     const rotDir = Math.random() < 0.5 ? 1 : -1;
     const rotSpd = rotDir * rng(
-      tier === 'large' ? 0.10 : tier === 'medium' ? 0.22 : 0.42,
-      tier === 'large' ? 0.32 : tier === 'medium' ? 0.58 : 0.90
+      tier === 'large' ? 0.08 : tier === 'medium' ? 0.16 : 0.28,
+      tier === 'large' ? 0.22 : tier === 'medium' ? 0.40 : 0.62
     );
+
+    // Per-asteroid lumpiness so each rock has unique chunkiness
+    const lumpiness = rng(0.45, 0.72);
+    const shape3D = makeRockShape(r, lumpiness);
+    // Independent yaw/pitch/roll for proper 3D feel
+    const eulerSpd = {
+      x: rng(-0.6, 0.6) * (tier === 'small' ? 1.6 : tier === 'medium' ? 1.2 : 1),
+      y: rng(-0.6, 0.6) * (tier === 'small' ? 1.6 : tier === 'medium' ? 1.2 : 1),
+      z: rotSpd,
+    };
 
     return {
       x, y, vx: avx, vy: avy,
-      rotation: Math.random() * Math.PI * 2,
+      rotation: Math.random() * Math.PI * 2, // kept for compatibility (z-axis angle)
       rotSpd,
+      eulerX: Math.random() * Math.PI * 2,
+      eulerY: Math.random() * Math.PI * 2,
+      eulerZ: Math.random() * Math.PI * 2,
+      eulerSpd,
       tier, r,
       hp: t.hp, maxHp: t.hp,
-      shape:  makeShape(n, r),
-      cracks: makeCracks(tier === 'large' ? 4 : tier === 'medium' ? 3 : 2, r),
+      shape3D,
+      // 2D silhouette (computed each frame) — needed so we can clip/fill the body
+      projected: new Array(shape3D.verts.length),
+      hullIdx:   [],
       ci,
       glowPh:   Math.random() * Math.PI * 2,
       hitFlash: 0,
@@ -215,20 +281,17 @@
         const minD = (ai.r + aj.r) * 0.75;
         if (dist < minD) {
           const nx = dx / (dist || 1), ny = dy / (dist || 1);
-          // Separate
           const overlap = minD - dist;
           ai.x += nx * overlap * 0.5;
           ai.y += ny * overlap * 0.5;
           aj.x -= nx * overlap * 0.5;
           aj.y -= ny * overlap * 0.5;
-          // Elastic bounce
           const relVn = (ai.vx - aj.vx) * nx + (ai.vy - aj.vy) * ny;
           if (relVn < 0) {
             const imp = -relVn * 0.9;
             ai.vx += imp * nx; ai.vy += imp * ny;
             aj.vx -= imp * nx; aj.vy -= imp * ny;
           }
-          // 1 damage each (gated by bounceCD)
           if (ai.bounceCD <= 0 && aj.bounceCD <= 0) {
             ai.bounceCD = 0.5;
             aj.bounceCD = 0.5;
@@ -246,6 +309,12 @@
       a.hitFlash = Math.max(0, a.hitFlash - dt);
       a.glowPh   = (a.glowPh + dt * 1.7) % (Math.PI * 2);
 
+      // Advance 3D Euler angles
+      a.eulerX = (a.eulerX + a.eulerSpd.x * dt) % (Math.PI * 2);
+      a.eulerY = (a.eulerY + a.eulerSpd.y * dt) % (Math.PI * 2);
+      a.eulerZ = (a.eulerZ + a.eulerSpd.z * dt) % (Math.PI * 2);
+      a.rotation = a.eulerZ; // keep in sync for any external code that reads it
+
       // BH swirl animation
       if (a.swirl) {
         const sw = a.swirl;
@@ -256,7 +325,6 @@
         sw.angle  += (3 + frac * 10) * dt;
         a.x        = sw.bh.x + Math.cos(sw.angle) * r;
         a.y        = sw.bh.y + Math.sin(sw.angle) * r;
-        a.rotation += a.rotSpd * dt * (1 + frac * 4);
         continue;
       }
 
@@ -276,13 +344,12 @@
       }
       if (a.swirl) continue;
 
-      a.x        += a.vx * dt;
-      a.y        += a.vy * dt;
-      a.rotation += a.rotSpd * dt;
+      a.x += a.vx * dt;
+      a.y += a.vy * dt;
 
       if (a.bounceCD > 0) a.bounceCD -= dt;
 
-      // Globe collision — tight hitbox: asteroid center reaches globe surface
+      // Globe collision
       const globeEl = document.getElementById('globe-canvas');
       if (globeEl) {
         const gr     = globeEl.getBoundingClientRect();
@@ -308,7 +375,7 @@
         }
       }
 
-      // Moon collision — tight hitbox
+      // Moon collision
       const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
       if (moon) {
         const mdx   = a.x - moon.x, mdy = a.y - moon.y;
@@ -330,7 +397,7 @@
         }
       }
 
-      // Spaceship collision — 2 damage to ship, 1 to asteroid, with cooldown
+      // Spaceship collision
       const ship = window.Spaceship && window.Spaceship.get();
       if (ship && !ship.exploding && !ship.swirl) {
         const sdx     = ship.x - a.x, sdy = ship.y - a.y;
@@ -338,10 +405,8 @@
         const minDist = a.r * 0.75 + 14;
         if (sd < minDist) {
           const nx = sdx / sd, ny = sdy / sd;
-          // Separate positions to prevent clipping
           ship.x = a.x + nx * minDist;
           ship.y = a.y + ny * minDist;
-          // Elastic-ish bounce: project relative velocity onto normal
           const relVn = (ship.vx - a.vx) * nx + (ship.vy - a.vy) * ny;
           if (relVn < 0) {
             const imp = -relVn * 1.5;
@@ -368,11 +433,56 @@
 
   // ── Draw ─────────────────────────────────────────────────────────
 
-  function polyPath(a) {
-    ctx.beginPath();
-    ctx.moveTo(a.shape[0][0], a.shape[0][1]);
-    for (let i = 1; i < a.shape.length; i++) ctx.lineTo(a.shape[i][0], a.shape[i][1]);
-    ctx.closePath();
+  // Project a single 3D point through XYZ rotation to 2D screen space.
+  // Returns [sx, sy, z] where z is depth (more positive = closer to viewer).
+  function project(v, ex, ey, ez, scale) {
+    // Rotate around X
+    const cx = Math.cos(ex), sx = Math.sin(ex);
+    let y1 = v[1] * cx - v[2] * sx;
+    let z1 = v[1] * sx + v[2] * cx;
+    let x1 = v[0];
+    // Rotate around Y
+    const cy = Math.cos(ey), sy = Math.sin(ey);
+    let x2 = x1 * cy + z1 * sy;
+    let z2 = -x1 * sy + z1 * cy;
+    let y2 = y1;
+    // Rotate around Z
+    const cz = Math.cos(ez), sz = Math.sin(ez);
+    let x3 = x2 * cz - y2 * sz;
+    let y3 = x2 * sz + y2 * cz;
+    // Mild perspective: closer points appear slightly larger
+    const persp = 1 + z2 * 0.0008 * scale;
+    return [x3 * persp, y3 * persp, z2];
+  }
+
+  // Build convex hull of 2D points using gift-wrapping (small N, fast enough).
+  // Returns indices into the input array.
+  function convexHullIdx(pts) {
+    const n = pts.length;
+    if (n < 3) return pts.map((_, i) => i);
+    // Find leftmost
+    let leftmost = 0;
+    for (let i = 1; i < n; i++) {
+      if (pts[i][0] < pts[leftmost][0] ||
+         (pts[i][0] === pts[leftmost][0] && pts[i][1] < pts[leftmost][1])) {
+        leftmost = i;
+      }
+    }
+    const hull = [];
+    let p = leftmost;
+    let safety = 0;
+    do {
+      hull.push(p);
+      let q = (p + 1) % n;
+      for (let r = 0; r < n; r++) {
+        const cross = (pts[q][0] - pts[p][0]) * (pts[r][1] - pts[p][1]) -
+                      (pts[q][1] - pts[p][1]) * (pts[r][0] - pts[p][0]);
+        if (cross < 0) q = r;
+      }
+      p = q;
+      safety++;
+    } while (p !== leftmost && safety < n + 2);
+    return hull;
   }
 
   function drawAsteroid(a) {
@@ -382,87 +492,128 @@
     const glow    = 0.5 + Math.sin(a.glowPh) * 0.25;
     const hitFrac = Math.min(1, a.hitFlash / 0.22);
     const swFrac  = a.swirl ? Math.max(0, 1 - Math.pow(a.swirl.age / a.swirl.maxAge, 0.55)) : 1;
+    const scale   = swFrac;
 
-    // ── Fill + interior details (clipped to polygon) ──────────────────
+    // Project all 3D vertices to 2D (local space, asteroid centered at origin)
+    const verts3D = a.shape3D.verts;
+    for (let i = 0; i < verts3D.length; i++) {
+      const p = project(verts3D[i], a.eulerX, a.eulerY, a.eulerZ, scale);
+      a.projected[i] = [p[0] * scale, p[1] * scale, p[2]];
+    }
+
+    // Compute convex hull of projected points = the silhouette this frame
+    a.hullIdx = convexHullIdx(a.projected);
+
     ctx.save();
     ctx.translate(a.x, a.y);
-    ctx.rotate(a.rotation);
-    if (a.swirl) ctx.scale(swFrac, swFrac);
 
-    polyPath(a);
+    // ── 1. Dark body fill (clipped to silhouette) ───────────────────
+    ctx.beginPath();
+    const h0 = a.projected[a.hullIdx[0]];
+    ctx.moveTo(h0[0], h0[1]);
+    for (let i = 1; i < a.hullIdx.length; i++) {
+      const hp = a.projected[a.hullIdx[i]];
+      ctx.lineTo(hp[0], hp[1]);
+    }
+    ctx.closePath();
 
     if (hitFrac > 0) {
-      // Hit flash: solid bright neon
       const fr = Math.round(nc.r + (255 - nc.r) * hitFrac);
       const fg = Math.round(nc.g + (255 - nc.g) * hitFrac);
       const fb = Math.round(nc.b + (255 - nc.b) * hitFrac);
-      ctx.fillStyle = `rgba(${fr},${fg},${fb},${0.55 + hitFrac * 0.38})`;
+      ctx.fillStyle = `rgba(${fr},${fg},${fb},${0.45 + hitFrac * 0.40})`;
       ctx.fill();
     } else {
-      // Radial gradient: off-center light source gives depth.
-      // Light spot upper-left, shadow lower-right.
-      const litR = Math.round(nc.r * 0.22);
-      const litG = Math.round(nc.g * 0.22);
-      const litB = Math.round(nc.b * 0.22);
+      // Subtle radial fill: dark center, slightly lit on one side
+      const litR = Math.round(nc.r * 0.16);
+      const litG = Math.round(nc.g * 0.16);
+      const litB = Math.round(nc.b * 0.16);
       const grad = ctx.createRadialGradient(
-        -a.r * 0.30, -a.r * 0.35, 0,
-         a.r * 0.08,  a.r * 0.08, a.r * 1.05
+        -a.r * 0.25, -a.r * 0.30, 0,
+         a.r * 0.05,  a.r * 0.05, a.r * 1.10
       );
-      grad.addColorStop(0,    `rgb(${litR}, ${litG}, ${litB})`);
-      grad.addColorStop(0.50, `rgb(4, 2, 10)`);
-      grad.addColorStop(1,    `rgb(2, 1, 5)`);
+      grad.addColorStop(0,    `rgba(${litR},${litG},${litB},0.85)`);
+      grad.addColorStop(0.55, `rgba(6,3,16,0.88)`);
+      grad.addColorStop(1,    `rgba(2,1,8,0.95)`);
       ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Clip so cracks and specular stay inside the polygon
-      ctx.clip();
-
-      // Crack lines — thin neon strokes suggesting fractures
-      ctx.lineWidth   = 0.7;
-      ctx.lineCap     = 'round';
-      ctx.strokeStyle = nc.hex;
-      ctx.globalAlpha = 0.16 + glow * 0.07;
-      for (const cr of a.cracks) {
-        ctx.beginPath();
-        ctx.moveTo(cr.x1, cr.y1);
-        ctx.lineTo(cr.x2, cr.y2);
-        ctx.stroke();
-      }
-
-      // Specular highlight — tiny bright dot at the light-source side
-      ctx.globalAlpha = 1;
-      const sR = a.r * 0.13;
-      const sX = -a.r * 0.27, sY = -a.r * 0.31;
-      const sg = ctx.createRadialGradient(sX, sY, 0, sX, sY, sR);
-      sg.addColorStop(0, 'rgba(255, 255, 255, 0.50)');
-      sg.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      ctx.fillStyle = sg;
-      ctx.beginPath();
-      ctx.arc(sX, sY, sR, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    ctx.restore(); // also removes the clip
+    // ── 2. Wireframe edges ──────────────────────────────────────────
+    // Two passes' worth of styling driven by edge category:
+    //   - Silhouette edges (on the convex hull) → brightest, thicker, full glow.
+    //   - Interior edges (everything else) → dimmer, thinner, no glow.
+    // Depth-sorted (back-to-front) so the painter's order looks right.
+    const edges = a.shape3D.edges;
+    const edgeData = [];
+    for (let i = 0; i < edges.length; i++) {
+      const [ia, ib] = edges[i];
+      const za = a.projected[ia][2];
+      const zb = a.projected[ib][2];
+      edgeData.push({ ia, ib, avgZ: (za + zb) * 0.5 });
+    }
+    edgeData.sort((p, q) => p.avgZ - q.avgZ);
 
-    // ── Neon outline (separate pass so glow isn't clipped) ───────────
-    ctx.save();
-    ctx.translate(a.x, a.y);
-    ctx.rotate(a.rotation);
-    if (a.swirl) ctx.scale(swFrac, swFrac);
+    // Build a set of silhouette-edge keys (hull adjacency pairs)
+    const hullEdges = new Set();
+    for (let i = 0; i < a.hullIdx.length; i++) {
+      const ia = a.hullIdx[i];
+      const ib = a.hullIdx[(i + 1) % a.hullIdx.length];
+      hullEdges.add(ia < ib ? `${ia}-${ib}` : `${ib}-${ia}`);
+    }
 
-    polyPath(a);
+    // Per-tier sizing
+    const lwHull = a.tier === 'large' ? 2.0 : a.tier === 'medium' ? 1.6 : 1.3;
+    const lwIn   = a.tier === 'large' ? 1.1 : a.tier === 'medium' ? 0.9 : 0.8;
+    const baseGlow = (a.tier === 'large' ? 14 : a.tier === 'medium' ? 10 : 7) * (0.7 + glow * 0.6);
 
-    const glowR = (a.tier === 'large' ? 18 : a.tier === 'medium' ? 13 : 9) * (0.65 + glow * 0.65);
-    ctx.shadowColor = nc.hex;
-    ctx.shadowBlur  = glowR + hitFrac * 24;
-    ctx.strokeStyle = hitFrac > 0.55 ? '#ffffff' : nc.hex;
-    ctx.lineWidth   = (a.tier === 'large' ? 2.2 : a.tier === 'medium' ? 1.8 : 1.4) + hitFrac * 1.6;
-    ctx.lineJoin    = 'round';
-    ctx.stroke();
+    let zMin = Infinity, zMax = -Infinity;
+    for (const v of a.projected) {
+      if (v[2] < zMin) zMin = v[2];
+      if (v[2] > zMax) zMax = v[2];
+    }
+    const zRange = (zMax - zMin) || 1;
 
+    for (const e of edgeData) {
+      const pa = a.projected[e.ia];
+      const pb = a.projected[e.ib];
+      const depth = (e.avgZ - zMin) / zRange; // 0 = back, 1 = front
+      const key = e.ia < e.ib ? `${e.ia}-${e.ib}` : `${e.ib}-${e.ia}`;
+      const isSilhouette = hullEdges.has(key);
+      const isFront = depth > 0.45;
+
+      let alpha, lw, glw;
+      if (isSilhouette) {
+        alpha = 1;
+        lw    = lwHull;
+        glw   = baseGlow + hitFrac * 22;
+      } else if (isFront) {
+        alpha = 0.70;
+        lw    = lwIn;
+        glw   = 4;
+      } else {
+        alpha = 0.30 + depth * 0.25;
+        lw    = lwIn;
+        glw   = 0;
+      }
+
+      ctx.shadowColor = nc.hex;
+      ctx.shadowBlur  = glw;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = hitFrac > 0.55 ? '#ffffff' : nc.hex;
+      ctx.lineWidth   = lw + hitFrac * 1.2;
+      ctx.lineCap     = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pa[0], pa[1]);
+      ctx.lineTo(pb[0], pb[1]);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
     ctx.restore();
 
-    // Health bar (large & medium only, screen-aligned)
+    // ── 3. Health bar (large & medium only) ─────────────────────────
     if (a.tier !== 'small' && !a.swirl) {
       const health = Math.max(0, a.hp / a.maxHp);
       const BAR_W  = a.r * 2.4;
@@ -472,12 +623,8 @@
 
       ctx.save();
       ctx.globalAlpha = 0.88 * swFrac;
-
-      // Dark track
       ctx.fillStyle = 'rgba(6, 2, 18, 0.80)';
       ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
-
-      // Neon HP fill
       if (health > 0) {
         ctx.shadowColor = nc.hex;
         ctx.shadowBlur  = 5;
@@ -485,12 +632,9 @@
         ctx.fillRect(bx, by, BAR_W * health, BAR_H);
         ctx.shadowBlur  = 0;
       }
-
-      // Subtle border
       ctx.strokeStyle = 'rgba(90, 50, 180, 0.42)';
       ctx.lineWidth   = 0.7;
       ctx.strokeRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
-
       ctx.restore();
     }
   }
@@ -519,8 +663,6 @@
 
   // ── Public API ────────────────────────────────────────────────────
 
-  // Returns true if a point at (x,y) with collision radius hitR hits any asteroid.
-  // Damages the asteroid by dmg and returns true on a hit.
   function checkHit(x, y, hitR, dmg) {
     hitR = hitR ?? 10;
     dmg  = dmg  ?? 1;
