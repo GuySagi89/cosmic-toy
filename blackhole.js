@@ -5,8 +5,31 @@
 
   let blackHole       = null;
   let dyingBlackHoles = [];
+  let cooldown        = 0;
+  const COOLDOWN_MAX  = 30;
+
+  function updateCooldownUI() {
+    const pct    = cooldown > 0 ? `${((1 - cooldown / COOLDOWN_MAX) * 100).toFixed(1)}%` : '0%';
+    const active = cooldown > 0;
+    for (const el of [
+      document.getElementById('gadget-blackhole'),
+      document.querySelector('.gadget-cursor--blackhole'),
+    ]) {
+      if (!el) continue;
+      const wasOnCooldown = el.classList.contains('on-cooldown');
+      el.style.setProperty('--cd-pct', pct);
+      el.classList.toggle('on-cooldown', active);
+      if (wasOnCooldown && !active && el.classList.contains('gadget-slot')) {
+        el.classList.remove('ready-flash');
+        void el.offsetWidth;
+        el.classList.add('ready-flash');
+        el.addEventListener('animationend', () => el.classList.remove('ready-flash'), { once: true });
+      }
+    }
+  }
 
   function spawnBlackHole(x, y) {
+    if (cooldown > 0) return;
     if (blackHole) {
       blackHole.age = blackHole.maxAge * 0.92;
       if (!blackHole.explodeFired) {
@@ -16,6 +39,8 @@
       dyingBlackHoles.push(blackHole);
     }
     blackHole = { x, y, baseRadius: 28 * (window.gadgetScale || 1), age: 0, maxAge: 5.5, rotation: 0, explodeFired: false };
+    cooldown = COOLDOWN_MAX;
+    updateCooldownUI();
   }
 
   function lensedPos(sx, sy, bh) {
@@ -197,6 +222,10 @@
 
   window.BlackHole = {
     update(dt) {
+      if (cooldown > 0) {
+        cooldown = Math.max(0, cooldown - dt);
+        updateCooldownUI();
+      }
       for (let i = dyingBlackHoles.length - 1; i >= 0; i--) {
         const bh = dyingBlackHoles[i];
         bh.age      += dt;
@@ -217,6 +246,7 @@
         if (blackHole.age >= blackHole.maxAge) blackHole = null;
       }
     },
+    isReady:      () => cooldown <= 0,
     hasAny:       () => !!(blackHole || dyingBlackHoles.length),
     applyLensing: (x, y) => applyAllLensing(x, y),
     getAll:       () => blackHole ? [blackHole, ...dyingBlackHoles] : [...dyingBlackHoles],

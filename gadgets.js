@@ -24,7 +24,6 @@
   let lastMouseY        = 0;
 
   const CORSAIR_SVG = '<svg viewBox="-24 -24 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle r="20" stroke="#00f5ff" stroke-width="0.8" opacity="0.55"/><line x1="0" y1="-20" x2="0" y2="-9" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="0" y1="9" x2="0" y2="20" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="-20" y1="0" x2="-9" y2="0" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><line x1="9" y1="0" x2="20" y2="0" stroke="#00f5ff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/><path d="M-20,-11 L-20,-20 L-11,-20" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11,-20 L20,-20 L20,-11" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20,11 L20,20 L11,20" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M-11,20 L-20,20 L-20,11" stroke="#00f5ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle r="7" stroke="#ff00bb" stroke-width="1.2"><animate attributeName="opacity" values="1;0.3;1" dur="2.2s" repeatCount="indefinite"/></circle><circle r="1.8" fill="#ff00bb"><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.2s" repeatCount="indefinite"/></circle></svg>';
-  const ASTEROID_SVG = '<svg class="gadget-cursor-asteroid-svg" viewBox="-20 -20 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-18 10,-13 17,-4 15,9 6,17 -7,16 -16,7 -15,-6 -8,-16" fill="rgba(0,28,32,0.85)" stroke="#00f5ff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="3" cy="-4" r="2.5" fill="rgba(0,245,255,0.12)" stroke="#00f5ff" stroke-width="0.8"/></svg>';
 
   function moveCursor(x, y) {
     if (!cursorEl) return;
@@ -224,8 +223,7 @@
     if (activeGadget) {
       cursorEl = document.createElement('div');
       cursorEl.className = `gadget-cursor gadget-cursor--${activeGadget}`;
-      if (activeGadget === 'asteroid')  cursorEl.innerHTML = ASTEROID_SVG;
-      if (activeGadget === 'meteor-shower') {
+      if (activeGadget === 'blackhole' || activeGadget === 'meteor-shower' || activeGadget === 'comet') {
         const ring = document.createElement('div');
         ring.className = 'cooldown-ring';
         cursorEl.appendChild(ring);
@@ -304,15 +302,15 @@
     dragStartY = e.clientY;
 
     if (activeGadget === 'blackhole') {
-      window.spawnBlackHole && window.spawnBlackHole(e.clientX, e.clientY);
-      isDragging = false;
-      setActiveGadget('blackhole');
-      e.stopPropagation();
-    } else if (activeGadget === 'asteroid') {
-      window.Asteroids && window.Asteroids.spawnAt(e.clientX, e.clientY);
-      isDragging = false;
-      setActiveGadget('asteroid');
-      e.stopPropagation();
+      if (!window.BlackHole || window.BlackHole.isReady()) {
+        window.spawnBlackHole && window.spawnBlackHole(e.clientX, e.clientY);
+        isDragging = false;
+        setActiveGadget('blackhole');
+        e.stopPropagation();
+      } else {
+        isDragging = false;
+        e.stopPropagation();
+      }
     } else if (activeGadget === 'comet') {
       cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
       showDragOrigin(dragStartX, dragStartY, 'comet');
@@ -359,7 +357,7 @@
       hideDragFeedback();
     }
 
-    if (activeGadget === 'comet' && window.spawnComet) {
+    if (activeGadget === 'comet' && window.spawnComet && (!window.Comet || window.Comet.isReady())) {
       const now    = performance.now();
       const recent = cometDragHistory.filter(p => now - p.t < 100);
       let vx = 0, vy = 0;
@@ -451,7 +449,7 @@
         }
         return;
       }
-      setActiveGadget(slot.dataset.gadget);
+      if (!slot.classList.contains('on-cooldown')) setActiveGadget(slot.dataset.gadget);
     });
   });
 

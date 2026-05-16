@@ -166,15 +166,45 @@
     }
   }
 
+  let cooldown       = 0;
+  const COOLDOWN_MAX = 10;
+
+  function updateCooldownUI() {
+    const pct    = cooldown > 0 ? `${((1 - cooldown / COOLDOWN_MAX) * 100).toFixed(1)}%` : '0%';
+    const active = cooldown > 0;
+    for (const el of [
+      document.getElementById('gadget-comet'),
+      document.querySelector('.gadget-cursor--comet'),
+    ]) {
+      if (!el) continue;
+      const wasOnCooldown = el.classList.contains('on-cooldown');
+      el.style.setProperty('--cd-pct', pct);
+      el.classList.toggle('on-cooldown', active);
+      if (wasOnCooldown && !active && el.classList.contains('gadget-slot')) {
+        el.classList.remove('ready-flash');
+        void el.offsetWidth;
+        el.classList.add('ready-flash');
+        el.addEventListener('animationend', () => el.classList.remove('ready-flash'), { once: true });
+      }
+    }
+  }
+
   function spawnComet(x, y, vx, vy) {
+    if (cooldown > 0) return;
     const MAX_SPD = 320;
     const s = Math.hypot(vx, vy);
     if (s > MAX_SPD) { vx = vx / s * MAX_SPD; vy = vy / s * MAX_SPD; }
     if (comets.length >= 5) blastComet(comets.shift(), x, y);
     comets.push({ x, y, vx, vy, hp: 3 });
+    cooldown = COOLDOWN_MAX;
+    updateCooldownUI();
   }
 
   function updateComet(dt) {
+    if (cooldown > 0) {
+      cooldown = Math.max(0, cooldown - dt);
+      updateCooldownUI();
+    }
     for (let i = explosions.length - 1; i >= 0; i--) {
       explosions[i].age += dt;
       if (explosions[i].age >= explosions[i].maxAge) explosions.splice(i, 1);
@@ -421,9 +451,10 @@
   window.spawnImpactDebris = spawnImpactDebris;
 
   window.Comet = {
-    update: updateComet,
-    draw:   drawComet,
-    getAll: () => comets,
+    update:  updateComet,
+    draw:    drawComet,
+    isReady: () => cooldown <= 0,
+    getAll:  () => comets,
     damage(c, amount) {
       if (c.swirl || c.hp <= 0) return;
       c.hp -= amount;

@@ -18,9 +18,10 @@
 
   // Size tiers
   const TIERS = {
-    large:  { rMin: 54, rMax: 72, hp: 3, sMin: 22, sMax: 46, splits: 'medium', splitN: 2    },
-    medium: { rMin: 27, rMax: 41, hp: 2, sMin: 38, sMax: 68, splits: 'small',  splitN: [2,3] },
-    small:  { rMin: 13, rMax: 21, hp: 1, sMin: 58, sMax: 95, splits: null                   },
+    gigantic: { rMin: 95, rMax: 130, hp: 30, sMin: 22, sMax: 50, splits: 'large', splitN: [2,3] },
+    large:    { rMin: 54, rMax: 72,  hp: 10, sMin: 55, sMax: 110, splits: 'medium', splitN: 2    },
+    medium:   { rMin: 27, rMax: 41,  hp: 5,  sMin: 90, sMax: 160, splits: 'small',  splitN: [2,3] },
+    small:    { rMin: 13, rMax: 21,  hp: 1,  sMin: 130, sMax: 220, splits: null                   },
   };
 
   let asteroids = [];
@@ -121,8 +122,8 @@
     // Slower base spin since 3D rotation is more visually busy
     const rotDir = Math.random() < 0.5 ? 1 : -1;
     const rotSpd = rotDir * rng(
-      tier === 'large' ? 0.08 : tier === 'medium' ? 0.16 : 0.28,
-      tier === 'large' ? 0.22 : tier === 'medium' ? 0.40 : 0.62
+      tier === 'gigantic' ? 0.03 : tier === 'large' ? 0.08 : tier === 'medium' ? 0.16 : 0.28,
+      tier === 'gigantic' ? 0.10 : tier === 'large' ? 0.22 : tier === 'medium' ? 0.40 : 0.62
     );
 
     // Per-asteroid lumpiness so each rock has unique chunkiness
@@ -130,8 +131,8 @@
     const shape3D = makeRockShape(r, lumpiness);
     // Independent yaw/pitch/roll for proper 3D feel
     const eulerSpd = {
-      x: rng(-0.6, 0.6) * (tier === 'small' ? 1.6 : tier === 'medium' ? 1.2 : 1),
-      y: rng(-0.6, 0.6) * (tier === 'small' ? 1.6 : tier === 'medium' ? 1.2 : 1),
+      x: rng(-0.6, 0.6) * (tier === 'small' ? 1.6 : tier === 'medium' ? 1.2 : tier === 'large' ? 1.0 : 0.50),
+      y: rng(-0.6, 0.6) * (tier === 'small' ? 1.6 : tier === 'medium' ? 1.2 : tier === 'large' ? 1.0 : 0.50),
       z: rotSpd,
     };
 
@@ -259,9 +260,123 @@
     return true;
   }
 
+  // ── Auto-spawner ──────────────────────────────────────────────────
+
+  let autoTimer    = rng(8, 15);
+  let pendingSpawns = []; // [{ delay, fn }] — queued individual spawns for barrages
+
+  function getGlobeCenter() {
+    const globeEl = document.getElementById('globe-canvas');
+    if (globeEl) {
+      const gr = globeEl.getBoundingClientRect();
+      return { x: gr.left + gr.width / 2, y: gr.top + gr.height / 2 };
+    }
+    return { x: canvas.width * 0.5, y: canvas.height * 0.5 };
+  }
+
+  // Spawn one asteroid from a given edge side (0=top,1=right,2=bottom,3=left)
+  function spawnOne(tier, side) {
+    const W = canvas.width, H = canvas.height;
+    let x, y;
+    if      (side === 0) { x = rng(W * 0.1, W * 0.9); y = -90; }
+    else if (side === 1) { x = W + 90;  y = rng(H * 0.1, H * 0.9); }
+    else if (side === 2) { x = rng(W * 0.1, W * 0.9); y = H + 90; }
+    else                 { x = -90;     y = rng(H * 0.1, H * 0.9); }
+    const gc = getGlobeCenter();
+    const t  = TIERS[tier];
+    const dx = gc.x - x + (Math.random() - 0.5) * 90;
+    const dy = gc.y - y + (Math.random() - 0.5) * 90;
+    const d  = Math.hypot(dx, dy) || 1;
+    const spd = rng(t.sMin, t.sMax);
+    asteroids.push(createAsteroid(x, y, tier, (dx / d) * spd, (dy / d) * spd));
+  }
+
+  // Spawn a side-by-side cluster from one edge
+  function spawnCluster(tier, count) {
+    const W = canvas.width, H = canvas.height;
+    const side = Math.floor(Math.random() * 4);
+    let baseX, baseY;
+    if      (side === 0) { baseX = rng(W * 0.15, W * 0.85); baseY = -90; }
+    else if (side === 1) { baseX = W + 90;  baseY = rng(H * 0.15, H * 0.85); }
+    else if (side === 2) { baseX = rng(W * 0.15, W * 0.85); baseY = H + 90; }
+    else                 { baseX = -90;     baseY = rng(H * 0.15, H * 0.85); }
+
+    const gc = getGlobeCenter();
+    const t  = TIERS[tier];
+    const aimX = gc.x + (Math.random() - 0.5) * 80;
+    const aimY = gc.y + (Math.random() - 0.5) * 80;
+    const tDx = aimX - baseX, tDy = aimY - baseY;
+    const tD  = Math.hypot(tDx, tDy) || 1;
+    const pnx = -tDy / tD, pny = tDx / tD; // perpendicular axis
+
+    const spacing = tier === 'gigantic' ? 300 : tier === 'large' ? 170 : tier === 'medium' ? 105 : 68;
+
+    for (let i = 0; i < count; i++) {
+      const offset = (i - (count - 1) / 2) * spacing;
+      const x = baseX + pnx * offset;
+      const y = baseY + pny * offset;
+      const indAimX = aimX + (Math.random() - 0.5) * 45;
+      const indAimY = aimY + (Math.random() - 0.5) * 45;
+      const dx = indAimX - x, dy = indAimY - y;
+      const d  = Math.hypot(dx, dy) || 1;
+      const spd = rng(t.sMin, t.sMax);
+      asteroids.push(createAsteroid(x, y, tier, (dx / d) * spd, (dy / d) * spd));
+    }
+  }
+
+  // Queue a rapid barrage of small asteroids, all from the same edge
+  function queueBarrage() {
+    const count = 10 + Math.floor(Math.random() * 6); // 10–15
+    const side  = Math.floor(Math.random() * 4);       // one side for the whole barrage
+    let delay = 0;
+    for (let i = 0; i < count; i++) {
+      delay += rng(0.18, 0.42);
+      const d = delay, s = side;
+      pendingSpawns.push({ delay: d, fn: () => { if (asteroids.length < 22) spawnOne('small', s); } });
+    }
+  }
+
+  function spawnWave() {
+    const hasGigantic = asteroids.some(a => a.tier === 'gigantic' && !a.dead);
+    // 8% chance of a solo gigantic, only if none already on screen
+    if (!hasGigantic && Math.random() < 0.08) {
+      spawnOne('gigantic', Math.floor(Math.random() * 4));
+      return;
+    }
+    if (Math.random() < 0.38) {
+      // Barrage: 10–15 small asteroids rapid-fired from one edge
+      queueBarrage();
+    } else {
+      // Cluster: 2+ asteroids side-by-side — only skip if very crowded
+      if (asteroids.length >= 18) return;
+      const tr = Math.random();
+      const tier = tr < 0.45 ? 'small' : tr < 0.75 ? 'medium' : 'large';
+      const count = tier === 'large' ? 2 + Math.floor(Math.random() * 2)
+                  : tier === 'medium' ? 2 + Math.floor(Math.random() * 3)
+                  : 3 + Math.floor(Math.random() * 3);
+      spawnCluster(tier, count);
+    }
+  }
+
   // ── Update ────────────────────────────────────────────────────────
 
   function update(dt) {
+    // Auto-spawn wave
+    autoTimer -= dt;
+    if (autoTimer <= 0) {
+      spawnWave();
+      autoTimer = rng(5, 10);
+    }
+
+    // Tick queued barrage spawns
+    for (let i = pendingSpawns.length - 1; i >= 0; i--) {
+      pendingSpawns[i].delay -= dt;
+      if (pendingSpawns[i].delay <= 0) {
+        pendingSpawns[i].fn();
+        pendingSpawns.splice(i, 1);
+      }
+    }
+
     // Update spark fragments
     for (let i = fragments.length - 1; i >= 0; i--) {
       const p = fragments[i];
@@ -640,9 +755,9 @@
     }
 
     // Per-tier sizing
-    const lwHull = a.tier === 'large' ? 2.0 : a.tier === 'medium' ? 1.6 : 1.3;
-    const lwIn   = a.tier === 'large' ? 1.1 : a.tier === 'medium' ? 0.9 : 0.8;
-    const baseGlow = (a.tier === 'large' ? 14 : a.tier === 'medium' ? 10 : 7) * (0.7 + glow * 0.6);
+    const lwHull = a.tier === 'gigantic' ? 3.0 : a.tier === 'large' ? 2.0 : a.tier === 'medium' ? 1.6 : 1.3;
+    const lwIn   = a.tier === 'gigantic' ? 1.6 : a.tier === 'large' ? 1.1 : a.tier === 'medium' ? 0.9 : 0.8;
+    const baseGlow = (a.tier === 'gigantic' ? 26 : a.tier === 'large' ? 14 : a.tier === 'medium' ? 10 : 7) * (0.7 + glow * 0.6);
 
     let zMin = Infinity, zMax = -Infinity;
     for (const v of a.projected) {

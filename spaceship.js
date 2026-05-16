@@ -711,6 +711,88 @@
     ctx.translate(spaceship.x, spaceship.y);
     ctx.scale(gs, gs);
 
+    if (spaceship.intro) {
+      const t       = Math.min(1, spaceship.intro.age / spaceship.intro.duration);
+      const fadeIn  = Math.min(1, t / 0.15);
+      const fadeOut = t > 0.50 ? 1 - (t - 0.50) / 0.50 : 1;
+      const bAlpha  = fadeIn * fadeOut;
+      const pulse   = 0.5 + 0.5 * Math.sin(Date.now() / 800 * Math.PI * 2);
+      const shieldR = 30;
+
+      ctx.save();
+
+      // Outer halo bloom
+      const halo = ctx.createRadialGradient(0, 0, shieldR * 0.5, 0, 0, shieldR * 2.0);
+      halo.addColorStop(0,   `rgba(0, 245, 255, 0)`);
+      halo.addColorStop(0.5, `rgba(0, 245, 255, ${bAlpha * 0.08})`);
+      halo.addColorStop(1,   `rgba(0, 245, 255, 0)`);
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR * 2.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rim lighting — bright at edge, hollow center (Fresnel)
+      const rim = ctx.createRadialGradient(0, 0, shieldR * 0.52, 0, 0, shieldR);
+      rim.addColorStop(0,    `rgba(0, 210, 255, ${bAlpha * 0.02})`);
+      rim.addColorStop(0.72, `rgba(0, 220, 255, ${bAlpha * 0.09})`);
+      rim.addColorStop(0.88, `rgba(40, 235, 255, ${bAlpha * 0.20})`);
+      rim.addColorStop(1,    `rgba(0, 215, 255,  ${bAlpha * 0.28})`);
+      ctx.fillStyle = rim;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner depth shadow — lower-right darker zone
+      const shadow = ctx.createRadialGradient(6, 9, 0, 6, 9, shieldR * 0.9);
+      shadow.addColorStop(0,   `rgba(0, 20, 70, ${bAlpha * 0.22})`);
+      shadow.addColorStop(0.5, `rgba(0, 15, 55, ${bAlpha * 0.10})`);
+      shadow.addColorStop(1,   `rgba(0,  0,  0, 0)`);
+      ctx.fillStyle = shadow;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Specular highlight — top-left crescent (light source)
+      const spec = ctx.createRadialGradient(-11, -13, 0, -11, -13, shieldR * 0.55);
+      spec.addColorStop(0,    `rgba(210, 255, 255, ${bAlpha * 0.60})`);
+      spec.addColorStop(0.22, `rgba(120, 245, 255, ${bAlpha * 0.25})`);
+      spec.addColorStop(0.50, `rgba(0,   210, 255, ${bAlpha * 0.07})`);
+      spec.addColorStop(1,    `rgba(0,   200, 255, 0)`);
+      ctx.fillStyle = spec;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Small secondary glint — bottom-right
+      const glint = ctx.createRadialGradient(12, 14, 0, 12, 14, shieldR * 0.28);
+      glint.addColorStop(0,   `rgba(180, 255, 255, ${bAlpha * 0.22})`);
+      glint.addColorStop(1,   `rgba(0, 200, 255, 0)`);
+      ctx.fillStyle = glint;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Magenta inner ring
+      ctx.shadowColor = 'rgba(255, 0, 187, 1)';
+      ctx.shadowBlur  = 6 + pulse * 5;
+      ctx.strokeStyle = `rgba(255, 0, 187, ${bAlpha * (0.35 + pulse * 0.18)})`;
+      ctx.lineWidth   = 0.7;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR * 0.75, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Cyan outer ring
+      ctx.shadowColor = 'rgba(0, 245, 255, 1)';
+      ctx.shadowBlur  = 10 + pulse * 8;
+      ctx.strokeStyle = `rgba(0, 245, 255, ${bAlpha * (0.60 + pulse * 0.28)})`;
+      ctx.lineWidth   = 1.0 + pulse * 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, shieldR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     if (hits >= 7 && !spaceship.swirl) {
       const period   = 1000 / warnFreq;
       const maxRingR = 55 + (hits - 14) * 14;

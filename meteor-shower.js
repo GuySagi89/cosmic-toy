@@ -25,12 +25,18 @@
       document.querySelector('.gadget-cursor--meteor-shower'),
     ]) {
       if (!el) continue;
+      const wasOnCooldown = el.classList.contains('on-cooldown');
       el.style.setProperty('--cd-pct', pct);
       el.classList.toggle('on-cooldown', active);
       if (el.classList.contains('gadget-cursor')) {
-        // Only dim/restore while cursor is actively shown; don't make it visible on mobile
         const cur = parseFloat(el.style.opacity);
         if (cur > 0) el.style.opacity = active ? '0.52' : '1';
+      }
+      if (wasOnCooldown && !active && el.classList.contains('gadget-slot')) {
+        el.classList.remove('ready-flash');
+        void el.offsetWidth;
+        el.classList.add('ready-flash');
+        el.addEventListener('animationend', () => el.classList.remove('ready-flash'), { once: true });
       }
     }
   }
