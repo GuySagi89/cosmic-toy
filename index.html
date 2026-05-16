@@ -29,20 +29,7 @@
         <span class="gadget-tooltip-hint">Click to place</span>
       </div>
     </div>
-    <div class="gadget-slot" data-gadget="spaceship" id="gadget-spaceship">
-      <svg class="gadget-ship-icon" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7"
-          fill="#6848b8" fill-opacity="0.93"
-          stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/>
-        <ellipse cx="0" cy="-6" rx="2.5" ry="4.5"
-          fill="#98dcff" fill-opacity="0.90"
-          stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/>
-      </svg>
-      <div class="gadget-tooltip">
-        <span class="gadget-tooltip-name">Spaceship</span>
-        <span class="gadget-tooltip-hint">Click &amp; drag to fly</span>
-      </div>
-    </div>
+
     <div class="gadget-slot" data-gadget="comet" id="gadget-comet">
       <div class="gadget-tooltip">
         <span class="gadget-tooltip-name">Comet</span>
@@ -72,8 +59,9 @@
   </div>
 
   <button id="perf-toggle" class="perf-toggle" aria-label="Toggle performance mode">
-    <span class="perf-toggle-icon">⚡</span>
-    <span class="perf-toggle-label">Perf</span>
+    <span class="perf-toggle-track">
+      <span class="perf-toggle-thumb"></span>
+    </span>
   </button>
 
   <script src="moon.js"></script>

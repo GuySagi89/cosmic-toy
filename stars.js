@@ -319,17 +319,12 @@
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       if (window.perfMode) {
         const a = alpha * 0.7;
-        ctx.fillStyle = p.ice   ? `rgba(180,235,255,${a})`
-                      : p.comet ? `rgba(120,200,255,${a})`
+        ctx.fillStyle = p.comet ? `rgba(120,200,255,${a})`
                       : p.core  ? `rgba(180,140,255,${a})`
                       :           `rgba(100,60,200,${a})`;
       } else {
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        if (p.ice) {
-          g.addColorStop(0,   `rgba(222, 248, 255, ${alpha})`);
-          g.addColorStop(0.4, `rgba(140, 215, 255, ${alpha * 0.55})`);
-          g.addColorStop(1,   'rgba(60, 148, 220, 0)');
-        } else if (p.comet) {
+        if (p.comet) {
           g.addColorStop(0,   `rgba(180, 240, 255, ${alpha})`);
           g.addColorStop(0.4, `rgba(80,  180, 255, ${alpha * 0.45})`);
           g.addColorStop(1,   'rgba(20, 80, 200, 0)');
