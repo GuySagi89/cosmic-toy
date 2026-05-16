@@ -8,7 +8,7 @@
   const BASE_SPEED     = 800;   // px/s
   const SPEED_VARIANCE = 220;
   const SPREAD         = 130;   // perpendicular spread (total)
-  const BACK_OFFSET    = 360;   // how far behind release to start spawning
+  const BACK_OFFSET    = 0;     // spawn at release point, not behind it
   const COOLDOWN_MAX   = 3.0;   // seconds between launches
 
   let showers  = [];
@@ -54,12 +54,11 @@
 
   function spawnOne(s) {
     const spread = (Math.random() - 0.5) * SPREAD;
-    const back   = BACK_OFFSET + Math.random() * 90;
     const drift  = (Math.random() - 0.5) * 32;
     const sp     = BASE_SPEED + (Math.random() - 0.5) * SPEED_VARIANCE;
     s.meteors.push({
-      x:  s.ox - s.dx * back + s.px * spread,
-      y:  s.oy - s.dy * back + s.py * spread,
+      x:  s.ox + s.px * spread,
+      y:  s.oy + s.py * spread,
       vx: s.dx * sp + s.px * drift,
       vy: s.dy * sp + s.py * drift,
       r:  (2.2 + Math.random() * 1.4) * (window.gadgetScale || 1),
