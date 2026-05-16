@@ -347,12 +347,6 @@
       if (Math.hypot(aimDx, aimDy) > 5) {
         spaceship.angle = Math.atan2(aimDy, aimDx) + Math.PI / 2;
       }
-    } else if (spd > 12) {
-      spaceship.angle = lerpAngle(
-        spaceship.angle,
-        Math.atan2(spaceship.vy, spaceship.vx) + Math.PI / 2,
-        Math.min(1, dt * 14)
-      );
     }
 
     if (spd > 25 && window.smokeParticles.length < 300) {
@@ -778,6 +772,8 @@
     const dist = Math.hypot(dx, dy);
     if (dist < 1) return;
     const nx = dx / dist, ny = dy / dist;
+    spaceship._aimX = targetX;
+    spaceship._aimY = targetY;
     spaceship.angle = Math.atan2(ny, nx) + Math.PI / 2;
     lasers.push({
       x: spaceship.x + nx * 18, y: spaceship.y + ny * 18,

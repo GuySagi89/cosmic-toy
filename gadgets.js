@@ -199,6 +199,10 @@
     inventory.querySelectorAll('.gadget-slot').forEach(s => {
       s.classList.toggle('active', s.dataset.gadget === activeGadget);
     });
+    const moonSlot = inventory.querySelector('[data-gadget="moon"]');
+    if (moonSlot && window.Moon) {
+      moonSlot.classList.toggle('deployed', window.Moon.isDeployed() && !activeGadget);
+    }
 
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
     if (activeGadget) {
@@ -444,7 +448,10 @@
     slot.addEventListener('click', e => {
       e.stopPropagation();
       if (slot.dataset.gadget === 'moon') {
-        if (!window.Moon.isDeployed()) {
+        if (window.Moon.isDeployed()) {
+          window.Moon.undeploy();
+          slot.classList.remove('deployed');
+        } else {
           window.Moon.deploy();
           slot.classList.add('deployed');
         }

@@ -28,6 +28,9 @@
 
   function rng(a, b) { return a + Math.random() * (b - a); }
 
+  const MOBILE_MQ = window.matchMedia('(min-width: 600px) and (min-height: 600px)');
+  function sizeScale() { return MOBILE_MQ.matches ? 1 : 2 / 3; }
+
   // ── 3D Polyhedron Library ─────────────────────────────────────────
   // Each shape: { verts: [[x,y,z], ...], edges: [[i,j], ...] }
   // All vertices normalized so the furthest sits at radius 1.
@@ -104,7 +107,7 @@
 
   function createAsteroid(x, y, tier, vx, vy) {
     const t  = TIERS[tier];
-    const r  = rng(t.rMin, t.rMax);
+    const r  = rng(t.rMin, t.rMax) * sizeScale();
     const ci = Math.floor(Math.random() * NEON.length);
 
     let avx = vx, avy = vy;

@@ -319,5 +319,6 @@ function drawOrbitRing() {
     getPos()        { return getMoonPos(); },
     isDeployed()    { return moonDeployed; },
     deploy()        { moonDeployed = true; },
+    undeploy()      { moonDeployed = false; moonOrbitAngle = 0; moonOrbitSpeed = MOON_ORBIT_SPEED; },
   };
 })();
