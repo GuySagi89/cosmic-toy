@@ -443,6 +443,13 @@
 
     slot.addEventListener('click', e => {
       e.stopPropagation();
+      if (slot.dataset.gadget === 'moon') {
+        if (!window.Moon.isDeployed()) {
+          window.Moon.deploy();
+          slot.classList.add('deployed');
+        }
+        return;
+      }
       setActiveGadget(slot.dataset.gadget);
     });
   });

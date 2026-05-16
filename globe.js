@@ -255,8 +255,9 @@ function drawGlow() {
 
 
   function tick() {
-    window.Moon.update();
-    const moon = window.Moon.getPos();
+    const moonDeployed = window.Moon.isDeployed();
+    if (moonDeployed) window.Moon.update();
+    const moon = moonDeployed ? window.Moon.getPos() : null;
 
     rotSpeed += (ROT_SPEED - rotSpeed) * SPIN_DECAY;
     rotY += rotSpeed;
@@ -268,9 +269,9 @@ function drawGlow() {
 
     ctx.clearRect(0, 0, W, H);
     drawGlow();
-    window.Moon.drawOrbitRing();
+    if (moonDeployed) window.Moon.drawOrbitRing();
 
-    if (moon.mz > 0) {
+    if (moon && moon.mz > 0) {
       window.Moon.draw();
       drawGlobeFrost(true);
       drawLines(sorted);
@@ -281,7 +282,7 @@ function drawGlow() {
       drawLines(sorted);
       drawDots(sorted);
       drawGlobeFrost(false);
-      window.Moon.draw();
+      if (moon) window.Moon.draw();
     }
 
     requestAnimationFrame(tick);

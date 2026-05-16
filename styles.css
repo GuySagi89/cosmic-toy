@@ -183,6 +183,52 @@ body {
   }
 }
 
+/* ── Moon slot ── */
+#gadget-moon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 38% 38%, #0d0525 0%, #030010 60%);
+  box-shadow:
+    0 0 0 1px rgba(175, 145, 255, 0.30),
+    0 0 12px 4px rgba(140, 100, 240, 0.30),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+  transition: box-shadow 0.22s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #gadget-moon:hover {
+    box-shadow:
+      0 0 0 1px rgba(205, 180, 255, 0.56),
+      0 0 20px 6px rgba(165, 120, 255, 0.58),
+      inset 0 0 10px rgba(0, 0, 0, 0.92);
+  }
+}
+
+#gadget-moon.deployed {
+  box-shadow:
+    0 0 0 2px rgba(215, 200, 255, 0.90),
+    0 0 28px 10px rgba(170, 130, 255, 0.80),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+  cursor: default;
+}
+
+.gadget-moon-icon {
+  width: calc(var(--slot-size) * 0.64);
+  height: calc(var(--slot-size) * 0.64);
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 4px rgba(200, 175, 255, 0.65))
+    drop-shadow(0 0 10px rgba(160, 120, 255, 0.35));
+  transition: filter 0.22s ease;
+}
+
+#gadget-moon.deployed .gadget-moon-icon {
+  filter:
+    drop-shadow(0 0 8px rgba(215, 200, 255, 0.95))
+    drop-shadow(0 0 18px rgba(175, 140, 255, 0.70));
+}
+
 /* ── Gadget tooltip ── */
 .gadget-tooltip {
   position: absolute;

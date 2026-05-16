@@ -47,6 +47,7 @@
   let moonOrbitAngle   = 0;
   let moonSelfAngle    = 0;
   let moonOrbitSpeed   = MOON_ORBIT_SPEED;
+  let moonDeployed     = false;
   let moonFrostPatches = [];
   let moonFreezeEnd   = 0;   // ms timestamp when freeze ends; 0 = not frozen
   let moonGlobalFrost = 0;   // 0–1 blend toward icy white for the whole moon
@@ -294,6 +295,7 @@ function drawOrbitRing() {
 
   window.Moon = {
     update() {
+      if (!moonDeployed) return;
       moonSelfAngle += MOON_SELF_SPEED;
       const now = Date.now();
       if (moonFreezeEnd > 0) {
@@ -315,5 +317,7 @@ function drawOrbitRing() {
     draw()          { drawMoon(getMoonPos()); },
     drawOrbitRing() { drawOrbitRing(); },
     getPos()        { return getMoonPos(); },
+    isDeployed()    { return moonDeployed; },
+    deploy()        { moonDeployed = true; },
   };
 })();
