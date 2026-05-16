@@ -834,10 +834,18 @@
     }
   };
   window.updateSpaceshipTarget = function(x, y) {
-    if (spaceship) { spaceship.targetX = x; spaceship.targetY = y; }
+    if (spaceship) {
+      spaceship.targetX = x;
+      spaceship.targetY = y;
+      spaceship._aimX   = x;
+      spaceship._aimY   = y;
+    }
   };
   window.releaseSpaceship = function() {
-    if (spaceship && !spaceship.intro) spaceship.active = false;
+    if (!spaceship || spaceship.intro) return;
+    spaceship.active = false;
+    spaceship._aimX  = null;
+    spaceship._aimY  = null;
   };
 
   window.fireSpaceshipLaser = function(targetX, targetY) {
