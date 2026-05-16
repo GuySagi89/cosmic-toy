@@ -105,10 +105,10 @@
     return { verts, edges: BASE_ICOSA_EDGES };
   }
 
-  function createAsteroid(x, y, tier, vx, vy) {
+  function createAsteroid(x, y, tier, vx, vy, forceCi) {
     const t  = TIERS[tier];
     const r  = rng(t.rMin, t.rMax) * sizeScale();
-    const ci = Math.floor(Math.random() * NEON.length);
+    const ci = forceCi ?? Math.floor(Math.random() * NEON.length);
 
     let avx = vx, avy = vy;
     if (avx == null) {
@@ -234,7 +234,7 @@
       asteroids.push(createAsteroid(
         a.x + Math.cos(ang) * off,
         a.y + Math.sin(ang) * off,
-        t.splits, vx, vy
+        t.splits, vx, vy, a.ci
       ));
     }
 
