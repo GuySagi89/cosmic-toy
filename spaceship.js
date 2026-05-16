@@ -345,8 +345,10 @@
       const aimDx = spaceship._aimX - spaceship.x;
       const aimDy = spaceship._aimY - spaceship.y;
       if (Math.hypot(aimDx, aimDy) > 5) {
-        spaceship.angle = Math.atan2(aimDy, aimDx) + Math.PI / 2;
+        spaceship.angle = lerpAngle(spaceship.angle, Math.atan2(aimDy, aimDx) + Math.PI / 2, dt * 12);
       }
+    } else if (spd > 25) {
+      spaceship.angle = lerpAngle(spaceship.angle, Math.atan2(spaceship.vy, spaceship.vx) + Math.PI / 2, dt * 8);
     }
 
     if (spd > 25 && window.smokeParticles.length < 300) {
