@@ -269,7 +269,9 @@
     activePointerId = e.pointerId;
     if (e.pointerType !== 'mouse' && cursorEl) {
       moveCursor(e.clientX, e.clientY);
-      cursorEl.style.opacity = '1';
+      if (!(activeGadget === 'spaceship' && e.pointerType === 'touch')) {
+        cursorEl.style.opacity = '1';
+      }
     }
     isDragging = true;
     dragStartX = e.clientX;
@@ -319,7 +321,7 @@
         if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 12) {
           spaceshipTouchPending = false;
           window.startSpaceship && window.startSpaceship(dragStartX, dragStartY);
-          if (cursorEl) cursorEl.classList.add('pressing');
+          if (cursorEl) { cursorEl.style.opacity = '1'; cursorEl.classList.add('pressing'); }
           overlay.setPointerCapture(e.pointerId);
           window.updateSpaceshipTarget && window.updateSpaceshipTarget(e.clientX, e.clientY);
         }
