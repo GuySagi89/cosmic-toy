@@ -319,6 +319,7 @@
       if (a.swirl) {
         const sw   = a.swirl;
         sw.age    += dt;
+        if (sw.bh.age >= sw.bh.maxAge) { a.dead = true; continue; }
         const frac = sw.age / sw.maxAge;
         const r    = sw.r * Math.pow(1 - frac, 0.65);
         const bhF  = sw.bh.age / sw.bh.maxAge;
@@ -675,5 +676,17 @@
     spawnAt(x, y, tier) { asteroids.push(createAsteroid(x, y, tier || 'large')); },
     checkHit,
     getAll: () => asteroids,
+    bhExplode(cx, cy, pullR) {
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i];
+        if (a.dead) continue;
+        if (a.swirl || Math.hypot(a.x - cx, a.y - cy) < pullR) {
+          spawnSplitFlash(a);
+          a.dead = true;
+        } else {
+          damageAsteroid(i, 1, a.x, a.y);
+        }
+      }
+    },
   };
 })();

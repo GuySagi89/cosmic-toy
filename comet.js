@@ -147,6 +147,7 @@
       if (c.swirl) {
         const sw   = c.swirl;
         sw.age    += dt;
+        if (sw.bh.age >= sw.bh.maxAge) { comets.splice(i, 1); continue; }
         const frac = sw.age / sw.maxAge;
         const r    = sw.r * Math.pow(1 - frac, 0.65);
         const bhF  = sw.bh.age / sw.bh.maxAge;

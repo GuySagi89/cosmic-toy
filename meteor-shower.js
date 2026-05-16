@@ -120,6 +120,7 @@
         if (m.swirl) {
           const sw   = m.swirl;
           sw.age    += dt;
+          if (sw.bh.age >= sw.bh.maxAge) { s.meteors.splice(mi, 1); continue; }
           const frac = sw.age / sw.maxAge;
           const r    = sw.r * Math.pow(1 - frac, 0.65);
           const bhF  = sw.bh.age / sw.bh.maxAge;
@@ -176,13 +177,9 @@
           hit = true;
         }
 
-        if (!hit) {
-          const ship = window.Spaceship && window.Spaceship.get();
-          if (ship && !ship.exploding && Math.hypot(m.x - ship.x, m.y - ship.y) < 18) {
-            window.Spaceship.hit(m.x, m.y, m.vx, m.vy, 0.5);
-            spawnImpact(m.x, m.y, m.vx, m.vy);
-            hit = true;
-          }
+        if (!hit && window.Asteroids && window.Asteroids.checkHit(m.x, m.y, m.r * 2, 0.5)) {
+          spawnImpact(m.x, m.y, m.vx, m.vy);
+          hit = true;
         }
 
         if (!hit && window.Comet) {

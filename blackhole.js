@@ -162,6 +162,14 @@
     const maxR    = screenEdgeDist(bh);
     const waveR   = rs + easeOut(evapFrac) * maxR;
 
+    if (!bh.waveHits.has('bhExplode')) {
+      bh.waveHits.add('bhExplode');
+      const innerR = bh.baseRadius * 8;
+      if (window.Asteroids)    window.Asteroids.bhExplode(bh.x, bh.y, innerR);
+      if (window.Comet)        window.Comet.blastInRadius(bh.x, bh.y, innerR);
+      if (window.MeteorShower) window.MeteorShower.blastInRadius(bh.x, bh.y, innerR);
+    }
+
     if (!bh.waveHits.has('globe')) {
       const globeEl = document.getElementById('globe-canvas');
       if (globeEl) {
