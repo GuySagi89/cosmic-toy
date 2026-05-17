@@ -4,7 +4,7 @@
   const ctx    = canvas.getContext('2d');
   const { updateCooldownUI, addTrailPoint, getGlobeBounds } = window.CosmicUtils;
 
-  const COUNT          = 28;
+  const COUNT          = 42;
   const SPAWN_DURATION = 4.4;   // s to emit all meteors
   const BASE_SPEED     = 800;   // px/s
   const SPEED_VARIANCE = 220;
@@ -51,7 +51,7 @@
       y:  s.oy + s.py * spread,
       vx: s.dx * sp + s.px * drift,
       vy: s.dy * sp + s.py * drift,
-      r:  (2.2 + Math.random() * 1.4) * (window.gadgetScale || 1),
+      r:  (3.2 + Math.random() * 2.0) * (window.gadgetScale || 1),
       trail: [],
       age: 0,
     });
@@ -126,7 +126,7 @@
           hit = true;
         }
 
-        if (!hit && window.Asteroids && window.Asteroids.checkHit(m.x, m.y, m.r * 2, 0.5)) {
+        if (!hit && window.Asteroids && window.Asteroids.checkHit(m.x, m.y, m.r * 2, 1)) {
           spawnImpact(m.x, m.y, m.vx, m.vy);
           hit = true;
         }
@@ -135,7 +135,7 @@
           const allComets = [...window.Comet.getAll()];
           for (const c of allComets) {
             if (!c.swirl && Math.hypot(m.x - c.x, m.y - c.y) < 28) {
-              window.Comet.damage(c, 0.5);
+              window.Comet.damage(c, 1);
               spawnImpact(m.x, m.y, m.vx, m.vy);
               hit = true;
               break;
