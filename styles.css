@@ -784,6 +784,10 @@ body {
   top: 54px;
 }
 
+@media (pointer: coarse) {
+  #mobile-toggle { display: none; }
+}
+
 #mobile-toggle.active .perf-toggle-track {
   border-color: rgba(0, 210, 255, 0.60);
   box-shadow: 0 0 10px 2px rgba(0, 180, 230, 0.25);

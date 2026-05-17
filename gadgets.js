@@ -336,15 +336,19 @@
         e.stopPropagation();
       }
     } else if (activeGadget === 'comet') {
-      cometDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-      showDragOrigin(dragStartX, dragStartY, 'comet');
-      overlay.setPointerCapture(e.pointerId);
-    } else if (activeGadget === 'meteor-shower') {
-      meteorDragHistory = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-      overlay.setPointerCapture(e.pointerId);
-      if (!window.MeteorShower || window.MeteorShower.isReady()) {
-        showDragOrigin(dragStartX, dragStartY, 'meteor-shower');
+      if (window.spawnComet && (!window.Comet || window.Comet.isReady())) {
+        window.spawnComet(e.clientX, e.clientY, 0, 500);
       }
+      isDragging = false;
+      setActiveGadget('comet');
+      e.stopPropagation();
+    } else if (activeGadget === 'meteor-shower') {
+      if (window.spawnMeteorShower && (!window.MeteorShower || window.MeteorShower.isReady())) {
+        window.spawnMeteorShower(e.clientX, e.clientY, 0, 500);
+      }
+      isDragging = false;
+      setActiveGadget('meteor-shower');
+      e.stopPropagation();
     }
   }
 
@@ -353,18 +357,6 @@
     moveCursor(e.clientX, e.clientY);
     if (!isDragging) return;
 
-    if (activeGadget === 'comet') {
-      cometDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-      if (cometDragHistory.length > 10) cometDragHistory.shift();
-      updateDragFeedback(e.clientX, e.clientY);
-    } else if (activeGadget === 'meteor-shower') {
-      meteorDragHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-      if (meteorDragHistory.length > 10) meteorDragHistory.shift();
-      if (!svgEl && window.MeteorShower && window.MeteorShower.isReady()) {
-        showDragOrigin(e.clientX, e.clientY, 'meteor-shower');
-      }
-      updateDragFeedback(e.clientX, e.clientY);
-    }
   }
 
   function onUp(e) {
@@ -374,59 +366,7 @@
     if (e.pointerType !== 'mouse' && cursorEl) cursorEl.style.opacity = '0';
     if (!isDragging) return;
     isDragging = false;
-    // Trail gadgets: let animateTrail age the path out naturally; others: clean up now
-    if (activeGadget === 'comet' || activeGadget === 'meteor-shower') {
-      if (cursorEl) cursorEl.style.transform = 'translate(-50%, -50%)';
-    } else {
-      hideDragFeedback();
-    }
-
-    if (activeGadget === 'comet' && window.spawnComet && (!window.Comet || window.Comet.isReady())) {
-      const now    = performance.now();
-      const recent = cometDragHistory.filter(p => now - p.t < 100);
-      let vx = 0, vy = 0;
-      if (recent.length >= 2) {
-        const first = recent[0], last = recent[recent.length - 1];
-        const dtSec = (last.t - first.t) / 1000;
-        if (dtSec > 0.005) { vx = (last.x - first.x) / dtSec; vy = (last.y - first.y) / dtSec; }
-      }
-      if (Math.hypot(vx, vy) < 50) {
-        const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
-        const len = Math.hypot(dx, dy);
-        if (len > 5) {
-          const spd = Math.min(len * 3.5, 900);
-          vx = (dx / len) * spd; vy = (dy / len) * spd;
-        } else {
-          vx = 0; vy = -500;
-        }
-      } else {
-        const spd = Math.hypot(vx, vy);
-        if (spd > 1200) { vx = vx / spd * 1200; vy = vy / spd * 1200; }
-      }
-      window.spawnComet(e.clientX, e.clientY, vx, vy);
-      spawnThrowParticles(e.clientX, e.clientY, 'comet');
-      setActiveGadget('comet');
-    } else if (activeGadget === 'meteor-shower' && window.spawnMeteorShower) {
-      const now    = performance.now();
-      const recent = meteorDragHistory.filter(p => now - p.t < 100);
-      let dx = 0, dy = 0;
-      if (recent.length >= 2) {
-        const first = recent[0], last = recent[recent.length - 1];
-        const dtSec = (last.t - first.t) / 1000;
-        if (dtSec > 0.005) { dx = (last.x - first.x) / dtSec; dy = (last.y - first.y) / dtSec; }
-      }
-      if (Math.hypot(dx, dy) < 50) {
-        dx = e.clientX - dragStartX;
-        dy = e.clientY - dragStartY;
-      }
-      if (Math.hypot(dx, dy) > 15) {
-        window.spawnMeteorShower(e.clientX, e.clientY, dx, dy);
-      } else {
-        window.spawnMeteorShower(e.clientX, e.clientY, 0, 500);
-      }
-      spawnThrowParticles(e.clientX, e.clientY, 'meteor-shower');
-      setActiveGadget('meteor-shower');
-    }
+    hideDragFeedback();
   }
 
   function onCancel(e) {
