@@ -13,6 +13,31 @@
 
   <div id="gadget-inventory">
 <div class="gadget-slot" data-gadget="blackhole" id="gadget-blackhole">
+      <svg class="gadget-blackhole-icon" viewBox="-14 -14 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer lensing halo -->
+        <circle r="12.5" stroke="rgba(155,65,255,0.16)" stroke-width="2.8"/>
+        <!-- Disk group, tilted for depth -->
+        <g transform="rotate(-18)">
+          <!-- Back arc (upper, behind horizon) -->
+          <path d="M -10.5,0 A 10.5,3.8 0 0 0 10.5,0"
+                stroke="rgba(255,130,20,0.24)" stroke-width="2.8" stroke-linecap="round"/>
+          <!-- Event horizon -->
+          <circle r="5.1" fill="#000"/>
+          <!-- Photon ring -->
+          <circle r="5.75" stroke="rgba(215,120,255,0.90)" stroke-width="0.7"/>
+          <!-- Secondary glow ring -->
+          <circle r="6.65" stroke="rgba(155,60,250,0.26)" stroke-width="1.9"/>
+          <!-- Front arc — soft outer glow -->
+          <path d="M -10.5,0 A 10.5,3.8 0 0 1 10.5,0"
+                stroke="rgba(255,155,35,0.40)" stroke-width="6.5" stroke-linecap="round"/>
+          <!-- Front arc — bright core -->
+          <path d="M -10.5,0 A 10.5,3.8 0 0 1 10.5,0"
+                stroke="rgba(255,238,155,0.97)" stroke-width="2.2" stroke-linecap="round"/>
+          <!-- Inner hot ring (innermost edge, nearest horizon) -->
+          <path d="M -6.5,0 A 6.5,2.4 0 0 1 6.5,0"
+                stroke="rgba(255,252,232,0.88)" stroke-width="0.9" stroke-linecap="round"/>
+        </g>
+      </svg>
       <div class="cooldown-ring"></div>
       <div class="gadget-tooltip">
         <span class="gadget-tooltip-name">Black Hole</span>

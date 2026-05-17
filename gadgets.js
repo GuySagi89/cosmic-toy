@@ -218,6 +218,10 @@ updateCorsairVisibility(lastMouseX, lastMouseY);
         const srcIcon = document.querySelector('#gadget-electric-field .gadget-electric-field-icon');
         if (srcIcon) cursorEl.appendChild(srcIcon.cloneNode(true));
       }
+      if (activeGadget === 'blackhole') {
+        const srcIcon = document.querySelector('#gadget-blackhole .gadget-blackhole-icon');
+        if (srcIcon) cursorEl.appendChild(srcIcon.cloneNode(true));
+      }
       cursorEl.style.left = '-100px';
       cursorEl.style.top  = '-100px';
       document.body.appendChild(cursorEl);

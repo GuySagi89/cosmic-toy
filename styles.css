@@ -120,12 +120,31 @@ body {
 }
 
 #gadget-blackhole {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: radial-gradient(circle at 38% 38%, #1a004a 0%, #000000 55%);
   box-shadow:
     0 0 0 1px rgba(180, 140, 255, 0.35),
     0 0 12px 4px rgba(150, 90, 255, 0.50),
     inset 0 0 10px rgba(0, 0, 0, 0.95);
   transition: box-shadow 0.22s ease;
+}
+
+.gadget-blackhole-icon {
+  width: calc(var(--slot-size) * 0.80);
+  height: calc(var(--slot-size) * 0.80);
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 4px rgba(200, 110, 255, 0.70))
+    drop-shadow(0 0 10px rgba(150, 60, 255, 0.35));
+  transition: filter 0.22s ease;
+}
+
+#gadget-blackhole.active .gadget-blackhole-icon {
+  filter:
+    drop-shadow(0 0 7px rgba(220, 140, 255, 0.95))
+    drop-shadow(0 0 18px rgba(170, 80, 255, 0.65));
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -545,11 +564,19 @@ body {
 }
 
 .gadget-cursor--blackhole {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: radial-gradient(circle at 38% 38%, #1a004a 0%, #000000 55%);
   box-shadow:
     0 0 0 1.5px rgba(200, 170, 255, 0.85),
     0 0 14px 6px rgba(180, 110, 255, 0.78),
     inset 0 0 8px rgba(0, 0, 0, 0.95);
+}
+
+.gadget-cursor--blackhole .gadget-blackhole-icon {
+  width: 32px;
+  height: 32px;
 }
 
 .gadget-cursor--spaceship {
