@@ -16,8 +16,10 @@
   function refreshCooldownUI() { updateCooldownUI('electric-field', cooldown, COOLDOWN_MAX); }
 
   function spawnElectricField() {
-    if (cooldown > 0) return;
+    if (cooldown > 0 || active) return;
     active = true; age = 0; impacts = []; discharges = [];
+    cooldown = COOLDOWN_MAX;
+    refreshCooldownUI();
   }
 
   function impact(sx, sy) {
@@ -30,7 +32,7 @@
     if (cooldown > 0) { cooldown = Math.max(0, cooldown - dt); refreshCooldownUI(); }
     if (!active) return;
     age += dt;
-    if (age >= DURATION) { active = false; cooldown = COOLDOWN_MAX; refreshCooldownUI(); return; }
+    if (age >= DURATION) { active = false; return; }
 
     // Random discharge sparks (~6/s)
     if (Math.random() < dt * 6)
@@ -218,7 +220,7 @@
   window.ElectricField = {
     update, draw, drawHUD,
     isActive:     () => active,
-    isReady:      () => cooldown <= 0,
+    isReady:      () => !active && cooldown <= 0,
     SHIELD_FACTOR,
     impact,
   };

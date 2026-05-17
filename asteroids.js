@@ -159,6 +159,7 @@
       frozenVx: 0,
       frozenVy: 0,
       thaw:     null,
+      burst:    null,
     };
   }
 
@@ -475,6 +476,16 @@
         a.vy = a.thaw.vy * tf;
         if (tf >= 1) a.thaw = null;
       }
+
+      // Decay the electric-field burst contribution back to zero
+      if (a.burst) {
+        const rate = dt / a.burst.maxAge;
+        a.vx -= a.burst.dvx * rate;
+        a.vy -= a.burst.dvy * rate;
+        a.burst.age += dt;
+        if (a.burst.age >= a.burst.maxAge) a.burst = null;
+      }
+
       a.eulerX = (a.eulerX + a.eulerSpd.x * spinFrac * dt) % (Math.PI * 2);
       a.eulerY = (a.eulerY + a.eulerSpd.y * spinFrac * dt) % (Math.PI * 2);
       a.eulerZ = (a.eulerZ + a.eulerSpd.z * spinFrac * dt) % (Math.PI * 2);
@@ -495,7 +506,12 @@
           a.x = g.x + nx * (shieldR + a.r * 0.75);
           a.y = g.y + ny * (shieldR + a.r * 0.75);
           const dot = a.vx * nx + a.vy * ny;
-          if (dot < 0) { a.vx = (a.vx - 2 * dot * nx) * 0.7; a.vy = (a.vy - 2 * dot * ny) * 0.7; }
+          if (dot < 0) {
+            const BURST = 450;
+            a.vx = (a.vx - 2 * dot * nx) * 0.7 + nx * BURST;
+            a.vy = (a.vy - 2 * dot * ny) * 0.7 + ny * BURST;
+            a.burst = { dvx: nx * BURST, dvy: ny * BURST, age: 0, maxAge: 2.0 };
+          }
           a.bounceCD = 0.5;
           window.ElectricField.impact(a.x, a.y);
         }
@@ -877,6 +893,7 @@
           a.frozen   = 7.0;
           a.hitFlash = 0;
           a.thaw     = null;
+          a.burst    = null;
           a.vx = 0;
           a.vy = 0;
         }

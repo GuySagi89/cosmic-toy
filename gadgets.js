@@ -180,26 +180,6 @@
     if (Math.hypot(cx - last.x, cy - last.y) > 2) {
       dragPath.push({ x: cx, y: cy, t: performance.now() });
     }
-    const dx = cx - dragStartX, dy = cy - dragStartY;
-    if (activeGadget === 'comet' && window.smokeParticles && window.smokeParticles.length < 600) {
-      const len = Math.hypot(dx, dy) || 1;
-      const bx  = -dx / len, by = -dy / len;
-      for (let j = 0; j < 8; j++) {
-        const spread = (Math.random() - 0.5) * 1.1;
-        const cs = Math.cos(spread), ss = Math.sin(spread);
-        window.smokeParticles.push({
-          x: cx + (Math.random() - 0.5) * 6,
-          y: cy + (Math.random() - 0.5) * 6,
-          vx: (bx * cs - by * ss) * (25 + Math.random() * 45),
-          vy: (bx * ss + by * cs) * (25 + Math.random() * 45),
-          life: 0.35 + Math.random() * 0.3,
-          maxLife: 0.55,
-          r: 2.5 + Math.random() * 3.5,
-          core: Math.random() < 0.4,
-          comet: true,
-        });
-      }
-    }
   }
 
   function hideDragFeedback() {
@@ -229,10 +209,14 @@ updateCorsairVisibility(lastMouseX, lastMouseY);
     if (activeGadget) {
       cursorEl = document.createElement('div');
       cursorEl.className = `gadget-cursor gadget-cursor--${activeGadget}`;
-      if (activeGadget === 'blackhole' || activeGadget === 'meteor-shower' || activeGadget === 'comet') {
+      if (activeGadget === 'blackhole' || activeGadget === 'meteor-shower' || activeGadget === 'comet' || activeGadget === 'electric-field') {
         const ring = document.createElement('div');
         ring.className = 'cooldown-ring';
         cursorEl.appendChild(ring);
+      }
+      if (activeGadget === 'electric-field') {
+        const srcIcon = document.querySelector('#gadget-electric-field .gadget-electric-field-icon');
+        if (srcIcon) cursorEl.appendChild(srcIcon.cloneNode(true));
       }
       cursorEl.style.left = '-100px';
       cursorEl.style.top  = '-100px';
