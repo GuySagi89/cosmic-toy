@@ -10,7 +10,8 @@
       "Bash(git -C \"C:/Guy/GitHub/cosmic-toy/cosmic-toy\" show befed82 --stat)",
       "Bash(git -C \"C:/Guy/GitHub/cosmic-toy/cosmic-toy\" show befed82 -- styles.css)",
       "Bash(git -C \"C:/Guy/GitHub/cosmic-toy/cosmic-toy\" show befed82 -- gadgets.js)",
-      "Bash(git -C \"C:/Guy/GitHub/cosmic-toy/cosmic-toy\" show befed82 -- stars.js)"
+      "Bash(git -C \"C:/Guy/GitHub/cosmic-toy/cosmic-toy\" show befed82 -- stars.js)",
+      "WebSearch"
     ]
   }
 }

@@ -5,12 +5,12 @@
   const { updateCooldownUI, addTrailPoint, getGlobeBounds } = window.CosmicUtils;
 
   const COUNT          = 28;
-  const SPAWN_DURATION = 1.4;   // s to emit all meteors
+  const SPAWN_DURATION = 4.4;   // s to emit all meteors
   const BASE_SPEED     = 800;   // px/s
   const SPEED_VARIANCE = 220;
   const SPREAD         = 130;   // perpendicular spread (total)
   const BACK_OFFSET    = 0;     // spawn at release point, not behind it
-  const COOLDOWN_MAX   = 3.0;   // seconds between launches
+  const COOLDOWN_MAX   = 5.0;   // seconds between launches
 
   let showers  = [];
   let impacts  = [];
@@ -143,7 +143,7 @@
           }
         }
 
-        if (hit || m.age > 4.5 ||
+        if (hit || m.age > 7.5 ||
             m.x < -500 || m.x > canvas.width  + 500 ||
             m.y < -500 || m.y > canvas.height + 500) {
           s.meteors.splice(mi, 1);
