@@ -223,12 +223,7 @@
     inventory.querySelectorAll('.gadget-slot').forEach(s => {
       s.classList.toggle('active', s.dataset.gadget === activeGadget);
     });
-    const moonSlot = inventory.querySelector('[data-gadget="moon"]');
-    if (moonSlot && window.Moon) {
-      moonSlot.classList.toggle('deployed', window.Moon.isDeployed() && !activeGadget);
-    }
-
-    updateCorsairVisibility(lastMouseX, lastMouseY);
+updateCorsairVisibility(lastMouseX, lastMouseY);
 
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
     if (activeGadget) {
@@ -349,6 +344,13 @@
       isDragging = false;
       setActiveGadget('meteor-shower');
       e.stopPropagation();
+    } else if (activeGadget === 'electric-field') {
+      if (!window.ElectricField || window.ElectricField.isReady()) {
+        window.spawnElectricField && window.spawnElectricField();
+      }
+      isDragging = false;
+      setActiveGadget('electric-field');
+      e.stopPropagation();
     }
   }
 
@@ -403,16 +405,6 @@
 
     slot.addEventListener('click', e => {
       e.stopPropagation();
-      if (slot.dataset.gadget === 'moon') {
-        if (window.Moon.isDeployed()) {
-          window.Moon.undeploy();
-          slot.classList.remove('deployed');
-        } else {
-          window.Moon.deploy();
-          slot.classList.add('deployed');
-        }
-        return;
-      }
       if (!slot.classList.contains('on-cooldown')) setActiveGadget(slot.dataset.gadget);
     });
   });
@@ -424,10 +416,7 @@
       const slots = Array.from(inventory.querySelectorAll('.gadget-slot'));
       const slot  = slots[num - 1];
       if (!slot) return;
-      if (slot.dataset.gadget === 'moon') {
-        if (window.Moon.isDeployed()) { window.Moon.undeploy(); slot.classList.remove('deployed'); }
-        else                          { window.Moon.deploy();   slot.classList.add('deployed'); }
-      } else if (!slot.classList.contains('on-cooldown')) {
+      if (!slot.classList.contains('on-cooldown')) {
         setActiveGadget(slot.dataset.gadget);
       }
     }

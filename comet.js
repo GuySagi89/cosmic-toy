@@ -255,6 +255,13 @@
         comets.splice(i, 1); continue;
       }
 
+      if (g && window.ElectricField && window.ElectricField.isActive() &&
+          Math.hypot(c.x - g.x, c.y - g.y) < g.r * window.ElectricField.SHIELD_FACTOR) {
+        window.ElectricField.impact(c.x, c.y);
+        spawnImpactDebris(c.x, c.y, c.vx, c.vy);
+        comets.splice(i, 1); continue;
+      }
+
       if (g && Math.hypot(c.x - g.x, c.y - g.y) < g.r) {
         window.dispatchEvent(new CustomEvent('comet-globe-impact',
           { detail: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, source: 'comet' } }));

@@ -285,6 +285,8 @@ function drawGlow() {
       if (moon) window.Moon.draw();
     }
 
+    if (window.ElectricField && window.ElectricField.isActive()) window.ElectricField.draw(ctx);
+
     requestAnimationFrame(tick);
   }
 

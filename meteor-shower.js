@@ -110,7 +110,14 @@
 
         let hit = false;
 
-        if (g && Math.hypot(m.x - g.x, m.y - g.y) < g.r + m.r) {
+        if (!hit && g && window.ElectricField && window.ElectricField.isActive() &&
+            Math.hypot(m.x - g.x, m.y - g.y) < g.r * window.ElectricField.SHIELD_FACTOR + m.r) {
+          window.ElectricField.impact(m.x, m.y);
+          spawnImpact(m.x, m.y, m.vx, m.vy);
+          hit = true;
+        }
+
+        if (!hit && g && Math.hypot(m.x - g.x, m.y - g.y) < g.r + m.r) {
           window.dispatchEvent(new CustomEvent('comet-globe-impact', {
             detail: { x: m.x, y: m.y, vx: m.vx * 0.055, vy: m.vy * 0.055, source: 'meteor' }
           }));

@@ -485,6 +485,22 @@
 
       if (a.bounceCD > 0) a.bounceCD -= dt;
 
+      // Shield collision
+      if (g && window.ElectricField && window.ElectricField.isActive() && a.bounceCD <= 0) {
+        const shieldR = g.r * window.ElectricField.SHIELD_FACTOR;
+        const sdx = a.x - g.x, sdy = a.y - g.y;
+        const sdist = Math.hypot(sdx, sdy);
+        if (sdist < shieldR + a.r * 0.75) {
+          const nx = sdx / (sdist || 1), ny = sdy / (sdist || 1);
+          a.x = g.x + nx * (shieldR + a.r * 0.75);
+          a.y = g.y + ny * (shieldR + a.r * 0.75);
+          const dot = a.vx * nx + a.vy * ny;
+          if (dot < 0) { a.vx = (a.vx - 2 * dot * nx) * 0.7; a.vy = (a.vy - 2 * dot * ny) * 0.7; }
+          a.bounceCD = 0.5;
+          window.ElectricField.impact(a.x, a.y);
+        }
+      }
+
       // Globe collision
       if (g) {
         const bdx   = a.x - g.x, bdy = a.y - g.y;
