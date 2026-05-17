@@ -65,7 +65,7 @@
   }
 
   function spawnFreezeRing(x, y) {
-    freezeRings.push({ x, y, r: 0, maxR: 180, speed: 480, fadingOut: false, fadeAge: 0, maxFadeAge: 0.30 });
+    freezeRings.push({ x, y, r: 0, maxR: 240, speed: 480, fadingOut: false, fadeAge: 0, maxFadeAge: 0.30 });
   }
 
   function spawnFreezeExplosion(x, y) {
@@ -168,7 +168,7 @@
   }
 
   let cooldown       = 0;
-  const COOLDOWN_MAX = 10;
+  const COOLDOWN_MAX = 12;
 
   function spawnComet(x, y, vx, vy) {
     if (cooldown > 0) return;

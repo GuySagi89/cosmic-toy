@@ -21,8 +21,8 @@
   const TIERS = {
     gigantic: { rMin: 95, rMax: 130, hp: 30, sMin: 22, sMax: 50, splits: 'large', splitN: [2,3] },
     large:    { rMin: 54, rMax: 72,  hp: 10, sMin: 55, sMax: 110, splits: 'medium', splitN: 2    },
-    medium:   { rMin: 27, rMax: 41,  hp: 5,  sMin: 90, sMax: 160, splits: 'small',  splitN: [2,3] },
-    small:    { rMin: 13, rMax: 21,  hp: 1,  sMin: 130, sMax: 220, splits: null                   },
+    medium:   { rMin: 27, rMax: 41,  hp: 5,  sMin: 77, sMax: 136, splits: 'small',  splitN: [2,3] },
+    small:    { rMin: 13, rMax: 21,  hp: 1,  sMin: 111, sMax: 187, splits: null                   },
   };
 
   let asteroids = [];
@@ -858,7 +858,7 @@
         if (Math.hypot(a.x - cx, a.y - cy) <= r + a.r) {
           a.frozenVx = a.vx;
           a.frozenVy = a.vy;
-          a.frozen   = 5.0;
+          a.frozen   = 7.0;
           a.hitFlash = 0;
           a.thaw     = null;
           a.vx = 0;
