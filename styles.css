@@ -5,6 +5,7 @@ html {
   background: #0d0d1a;
   height: 100%;
   overflow: hidden;
+  touch-action: none;
   -webkit-touch-callout: none;
 }
 

@@ -508,6 +508,12 @@
 
   document.addEventListener('touchstart',  e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
   document.addEventListener('touchmove',   e => e.preventDefault(), { passive: false });
+  let _lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - _lastTouchEnd < 300) e.preventDefault();
+    _lastTouchEnd = now;
+  }, { passive: false });
   document.addEventListener('contextmenu', e => e.preventDefault());
   if ('ongesturestart' in window) {
     document.addEventListener('gesturestart',  e => e.preventDefault(), { passive: false });
