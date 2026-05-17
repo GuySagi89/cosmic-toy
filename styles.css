@@ -779,6 +779,27 @@ body {
   }
 }
 
+/* ── Mobile control mode toggle (positioned below perf-toggle) ── */
+#mobile-toggle {
+  top: 54px;
+}
+
+#mobile-toggle.active .perf-toggle-track {
+  border-color: rgba(0, 210, 255, 0.60);
+  box-shadow: 0 0 10px 2px rgba(0, 180, 230, 0.25);
+}
+
+#mobile-toggle.active .perf-toggle-thumb {
+  background: rgba(0, 235, 255, 0.95);
+  transform: translateX(20px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #mobile-toggle:hover .perf-toggle-track {
+    border-color: rgba(0, 210, 255, 0.42);
+  }
+}
+
 /* ── Synthwave Corsair Cursor ── */
 #corsair-cursor {
   position: fixed;

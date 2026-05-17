@@ -47,7 +47,16 @@
     if (lastPointerType !== 'mouse') return;
     if (activeGadget) { corsairEl.style.opacity = '0'; return; }
     const over   = document.elementFromPoint(x, y);
-    const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle'));
+    const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle')) || !!(over && over.closest('#mobile-toggle'));
+    if (window.mobileControlMode) {
+      if (overUI) {
+        corsairEl.style.opacity = '0';
+      } else {
+        corsairEl.classList.add('ship-drag');
+        corsairEl.style.opacity = '1';
+      }
+      return;
+    }
     corsairEl.style.opacity = overUI ? '0' : '1';
   }
 
@@ -254,7 +263,7 @@
     lastPointerType = e.pointerType;
     if (e.pointerType !== 'mouse') {
       const over   = document.elementFromPoint(e.clientX, e.clientY);
-      const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle'));
+      const overUI = inventory.contains(over) || !!(over && over.closest('#perf-toggle')) || !!(over && over.closest('#mobile-toggle'));
       if (!overUI) {
         corsairEl.style.left = e.clientX + 'px';
         corsairEl.style.top  = e.clientY + 'px';
@@ -295,7 +304,7 @@
     if (e.pointerType !== 'mouse') return;
     if (lastPointerType !== 'mouse') return; // ignore compat mouse events that follow a touch
     const over = document.elementFromPoint(e.clientX, e.clientY);
-    cursorEl.style.opacity = (over && inventory.contains(over)) ? '0'
+    cursorEl.style.opacity = (over && (inventory.contains(over) || over.closest('#perf-toggle') || over.closest('#mobile-toggle'))) ? '0'
       : cursorEl.classList.contains('on-cooldown') ? '0.52' : '1';
     updateCorsairVisibility(e.clientX, e.clientY);
   }, { capture: true });
@@ -495,6 +504,7 @@
     }
 
     function hideBeacon() {
+      if (window.mobileControlMode) return;
       corsairEl.classList.remove('ship-drag');
       corsairEl.style.opacity = '';
       updateCorsairVisibility(lastMouseX, lastMouseY);
@@ -504,11 +514,11 @@
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       if (activeGadget) return;
       if (inventory.contains(e.target)) return;
-      if (e.target.closest('#perf-toggle')) return;
+      if (e.target.closest('#perf-toggle') || e.target.closest('#mobile-toggle')) return;
       pendingPointerId = e.pointerId;
       pendingStartX    = e.clientX;
       pendingStartY    = e.clientY;
-      pendingIsDrag    = (e.pointerType !== 'touch');
+      pendingIsDrag    = (e.pointerType !== 'touch') && !window.mobileControlMode;
       if (pendingIsDrag) {
         window.startSpaceship && window.startSpaceship(e.clientX, e.clientY);
         showBeacon();
@@ -541,7 +551,20 @@
       hideBeacon();
       if (activeGadget) return;
       if (wasDrag) window.releaseSpaceship && window.releaseSpaceship();
-      else if (e.type === 'pointerup' && e.pointerType === 'touch') {
+      else if (e.type === 'pointerup' && (e.pointerType === 'touch' || (e.pointerType === 'mouse' && window.mobileControlMode))) {
+        if (e.pointerType === 'mouse' && window.mobileControlMode) {
+          corsairEl.classList.remove('ship-drag');
+          clearTimeout(corsairFlashTimer);
+          corsairFlashTimer = setTimeout(() => {
+            if (window.mobileControlMode) corsairEl.classList.add('ship-drag');
+          }, 280);
+        } else {
+          corsairEl.style.left = e.clientX + 'px';
+          corsairEl.style.top  = e.clientY + 'px';
+          corsairEl.style.opacity = '1';
+          clearTimeout(corsairFlashTimer);
+          corsairFlashTimer = setTimeout(() => { corsairEl.style.opacity = '0'; }, 280);
+        }
         window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
       }
     };
@@ -558,6 +581,30 @@
       window.perfMode = !window.perfMode;
       localStorage.setItem('perfMode', window.perfMode ? '1' : '0');
       perfToggle.classList.toggle('active', window.perfMode);
+    });
+  }
+
+  // ── Mobile control mode toggle ────────────────────────────────────
+  const mobileToggle = document.getElementById('mobile-toggle');
+  if (mobileToggle) {
+    window.mobileControlMode = localStorage.getItem('mobileControlMode') === '1';
+    mobileToggle.classList.toggle('active', window.mobileControlMode);
+    if (window.mobileControlMode) {
+      corsairEl.classList.add('ship-drag');
+      updateCorsairVisibility(lastMouseX, lastMouseY);
+    }
+    mobileToggle.addEventListener('click', () => {
+      window.mobileControlMode = !window.mobileControlMode;
+      localStorage.setItem('mobileControlMode', window.mobileControlMode ? '1' : '0');
+      mobileToggle.classList.toggle('active', window.mobileControlMode);
+      clearTimeout(corsairFlashTimer);
+      if (window.mobileControlMode) {
+        corsairEl.classList.add('ship-drag');
+      } else {
+        corsairEl.classList.remove('ship-drag');
+        corsairEl.style.opacity = '';
+      }
+      updateCorsairVisibility(lastMouseX, lastMouseY);
     });
   }
 })();

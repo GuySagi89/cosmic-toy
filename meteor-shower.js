@@ -234,13 +234,17 @@
       const r = Math.max(0.1, m.r * 3 * scale);
       ctx.save();
       ctx.globalAlpha = scale;
-      ctx.shadowColor = 'rgba(255, 160, 40, 1)';
-      ctx.shadowBlur  = 14 * scale;
-      const sg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
-      sg.addColorStop(0,    'rgba(255, 255, 220, 1)');
-      sg.addColorStop(0.4,  'rgba(255, 170,  60, 0.85)');
-      sg.addColorStop(1,    'rgba(255,  80,  10, 0)');
-      ctx.fillStyle = sg;
+      if (window.perfMode) {
+        ctx.fillStyle = 'rgba(255,160,40,0.7)';
+      } else {
+        ctx.shadowColor = 'rgba(255, 160, 40, 1)';
+        ctx.shadowBlur  = 14 * scale;
+        const sg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
+        sg.addColorStop(0,    'rgba(255, 255, 220, 1)');
+        sg.addColorStop(0.4,  'rgba(255, 170,  60, 0.85)');
+        sg.addColorStop(1,    'rgba(255,  80,  10, 0)');
+        ctx.fillStyle = sg;
+      }
       ctx.beginPath();
       ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
       ctx.fill();
@@ -267,14 +271,21 @@
     }
 
     // Outer glow
-    const grd = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 3.8);
-    grd.addColorStop(0,    'rgba(255,252,220,0.95)');
-    grd.addColorStop(0.32, 'rgba(255,175, 70,0.55)');
-    grd.addColorStop(1,    'rgba(255, 90, 15,0)');
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.arc(m.x, m.y, m.r * 3.8, 0, Math.PI * 2);
-    ctx.fill();
+    if (window.perfMode) {
+      ctx.fillStyle = 'rgba(255,175,70,0.35)';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const grd = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 3.8);
+      grd.addColorStop(0,    'rgba(255,252,220,0.95)');
+      grd.addColorStop(0.32, 'rgba(255,175, 70,0.55)');
+      grd.addColorStop(1,    'rgba(255, 90, 15,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r * 3.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Solid white core
     ctx.fillStyle = 'rgba(255,255,255,0.96)';

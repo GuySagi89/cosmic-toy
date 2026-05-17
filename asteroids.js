@@ -331,7 +331,7 @@
     for (let i = 0; i < count; i++) {
       delay += rng(0.18, 0.42);
       const d = delay, s = side;
-      pendingSpawns.push({ delay: d, fn: () => { if (asteroids.length < 22) spawnOne('small', s); } });
+      pendingSpawns.push({ delay: d, fn: () => { if (asteroids.length < (window.perfMode ? 8 : 22)) spawnOne('small', s); } });
     }
   }
 
@@ -347,7 +347,7 @@
       queueBarrage();
     } else {
       // Cluster: 2+ asteroids side-by-side — only skip if very crowded
-      if (asteroids.length >= 18) return;
+      if (asteroids.length >= (window.perfMode ? 8 : 18)) return;
       const tr = Math.random();
       const tier = tr < 0.45 ? 'small' : tr < 0.75 ? 'medium' : 'large';
       const count = tier === 'large' ? 2 + Math.floor(Math.random() * 2)
@@ -668,6 +668,8 @@
         const fr = Math.round(215 + (255 - 215) * hitFrac);
         const fg = Math.round(245 + (255 - 245) * hitFrac);
         ctx.fillStyle = `rgba(${fr},${fg},255,${0.72 + hitFrac * 0.28})`;
+      } else if (window.perfMode) {
+        ctx.fillStyle = 'rgba(120,195,235,0.75)';
       } else {
         const iceGrad = ctx.createRadialGradient(
           -a.r * 0.20, -a.r * 0.25, 0,
@@ -684,6 +686,9 @@
       const fg = Math.round(nc.g + (255 - nc.g) * hitFrac);
       const fb = Math.round(nc.b + (255 - nc.b) * hitFrac);
       ctx.fillStyle = `rgba(${fr},${fg},${fb},${0.45 + hitFrac * 0.40})`;
+      ctx.fill();
+    } else if (window.perfMode) {
+      ctx.fillStyle = nc.fill;
       ctx.fill();
     } else {
       // Subtle radial fill: dark center, slightly lit on one side
@@ -742,17 +747,18 @@
       const depth = (e.avgZ - zMin) / zRange; // 0 = back, 1 = front
       const key = e.ia < e.ib ? `${e.ia}-${e.ib}` : `${e.ib}-${e.ia}`;
       const isSilhouette = hullEdges.has(key);
+      if (window.perfMode && !isSilhouette) continue;
       const isFront = depth > 0.45;
 
       let alpha, lw, glw;
       if (isSilhouette) {
         alpha = 1;
         lw    = lwHull;
-        glw   = baseGlow + hitFrac * 22;
+        glw   = window.perfMode ? 0 : baseGlow + hitFrac * 22;
       } else if (isFront) {
         alpha = 0.70;
         lw    = lwIn;
-        glw   = 4;
+        glw   = window.perfMode ? 0 : 4;
       } else {
         alpha = 0.30 + depth * 0.25;
         lw    = lwIn;
@@ -776,7 +782,7 @@
     ctx.globalAlpha = 1;
 
     // Frost shimmer rings when frozen
-    if (isFrozen) {
+    if (isFrozen && !window.perfMode) {
       const shimmer = 0.20 + Math.sin(a.glowPh * 2.8) * 0.08;
       ctx.save();
       ctx.strokeStyle = 'rgba(210, 248, 255, 0.85)';
