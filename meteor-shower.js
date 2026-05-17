@@ -70,7 +70,7 @@
     {
       const flat = [];
       for (const s of showers) {
-        for (const m of s.meteors) { if (!m.swirl) flat.push({ s, m }); }
+        for (const m of s.meteors) flat.push({ s, m });
       }
       const dead = new Set();
       for (let i = flat.length - 1; i >= 1; i--) {
@@ -102,15 +102,6 @@
       for (let mi = s.meteors.length - 1; mi >= 0; mi--) {
         const m = s.meteors[mi];
         m.age += dt;
-
-        // Swirl into black hole
-        if (m.swirl) {
-          if (window.BlackHole.updateSwirl(m, dt)) s.meteors.splice(mi, 1);
-          continue;
-        }
-
-        // Black hole gravity
-        if (window.BlackHole && window.BlackHole.applyGravity(m, dt, { swirlMaxAge: 1.2, gravityK: 1200000, minSwirlR: 4 })) continue;
 
         addTrailPoint(m.trail, 8, m.x, m.y);
 
@@ -227,31 +218,6 @@
   }
 
   function drawMeteor(m) {
-    if (m.swirl) {
-      const frac  = m.swirl.age / m.swirl.maxAge;
-      const scale = Math.max(0, 1 - Math.pow(frac, 0.55));
-      if (scale < 0.02) return;
-      const r = Math.max(0.1, m.r * 3 * scale);
-      ctx.save();
-      ctx.globalAlpha = scale;
-      if (window.perfMode) {
-        ctx.fillStyle = 'rgba(255,160,40,0.7)';
-      } else {
-        ctx.shadowColor = 'rgba(255, 160, 40, 1)';
-        ctx.shadowBlur  = 14 * scale;
-        const sg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
-        sg.addColorStop(0,    'rgba(255, 255, 220, 1)');
-        sg.addColorStop(0.4,  'rgba(255, 170,  60, 0.85)');
-        sg.addColorStop(1,    'rgba(255,  80,  10, 0)');
-        ctx.fillStyle = sg;
-      }
-      ctx.beginPath();
-      ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      return;
-    }
-
     const trailLen = m.trail.length;
 
     if (trailLen >= 2) {
@@ -303,7 +269,6 @@
         const s = showers[si];
         for (let mi = s.meteors.length - 1; mi >= 0; mi--) {
           const m = s.meteors[mi];
-          if (m.swirl) continue;
           if (Math.hypot(cx - m.x, cy - m.y) <= r) {
             spawnImpact(m.x, m.y, m.vx, m.vy);
             s.meteors.splice(mi, 1);

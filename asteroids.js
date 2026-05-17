@@ -431,6 +431,13 @@
       a.hitFlash = Math.max(0, a.hitFlash - dt);
       a.glowPh   = (a.glowPh + dt * 1.7) % (Math.PI * 2);
 
+      // BH swirl and gravity take priority over frozen state
+      if (a.swirl) {
+        if (window.BlackHole.updateSwirl(a, dt)) a.dead = true;
+        continue;
+      }
+      if (window.BlackHole && window.BlackHole.applyGravity(a, dt, { swirlMaxAge: 2.5, gravityK: 1000000, minSwirlR: 6 })) continue;
+
       if (a.frozen > 0) {
         a.frozen = Math.max(0, a.frozen - dt);
         if (a.frozen === 0) {
@@ -472,15 +479,6 @@
       a.eulerY = (a.eulerY + a.eulerSpd.y * spinFrac * dt) % (Math.PI * 2);
       a.eulerZ = (a.eulerZ + a.eulerSpd.z * spinFrac * dt) % (Math.PI * 2);
       a.rotation = a.eulerZ;
-
-      // BH swirl animation
-      if (a.swirl) {
-        if (window.BlackHole.updateSwirl(a, dt)) a.dead = true;
-        continue;
-      }
-
-      // BH gravity pull
-      if (window.BlackHole && window.BlackHole.applyGravity(a, dt, { swirlMaxAge: 2.5, gravityK: 1000000, minSwirlR: 6 })) continue;
 
       a.x += a.vx * dt;
       a.y += a.vy * dt;

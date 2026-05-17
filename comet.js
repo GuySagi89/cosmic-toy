@@ -209,9 +209,7 @@
 
     // Comet-comet collisions
     for (let i = comets.length - 1; i >= 1; i--) {
-      if (comets[i].swirl) continue;
       for (let j = i - 1; j >= 0; j--) {
-        if (comets[j].swirl) continue;
         if (Math.hypot(comets[i].x - comets[j].x, comets[i].y - comets[j].y) < 18) {
           const mx = (comets[i].x + comets[j].x) * 0.5;
           const my = (comets[i].y + comets[j].y) * 0.5;
@@ -228,13 +226,6 @@
 
     for (let i = comets.length - 1; i >= 0; i--) {
       const c = comets[i];
-
-      if (c.swirl) {
-        if (window.BlackHole.updateSwirl(c, dt)) comets.splice(i, 1);
-        continue;
-      }
-
-      if (window.BlackHole && window.BlackHole.applyGravity(c, dt, { swirlMaxAge: 1.2, gravityK: 1200000, minSwirlR: 4 })) continue;
 
       c.x += c.vx * dt;
       c.y += c.vy * dt;
@@ -327,27 +318,6 @@
 
     for (const exp of explosions) drawExplosion(exp, gs);
     for (const c of comets) {
-      if (c.swirl) {
-        const frac  = c.swirl.age / c.swirl.maxAge;
-        const scale = Math.max(0, 1 - Math.pow(frac, 0.55));
-        if (scale < 0.02) continue;
-        const r = Math.max(0.1, 28 * gs * scale);
-        ctx.save();
-        ctx.globalAlpha = scale;
-        ctx.shadowColor = 'rgba(160, 240, 255, 1)';
-        ctx.shadowBlur  = 50 * gs * scale;
-        const cg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
-        cg.addColorStop(0,   'rgba(255, 255, 255, 1)');
-        cg.addColorStop(0.4, 'rgba(180, 240, 255, 0.85)');
-        cg.addColorStop(1,   'rgba(60, 160, 255, 0)');
-        ctx.fillStyle = cg;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        continue;
-      }
-
       const spd = Math.hypot(c.vx, c.vy);
       if (spd < 1) continue;
       const nx = c.vx / spd, ny = c.vy / spd;

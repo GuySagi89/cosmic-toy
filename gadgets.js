@@ -418,7 +418,19 @@
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && activeGadget) setActiveGadget(activeGadget);
+    if (e.key === 'Escape' && activeGadget) { setActiveGadget(activeGadget); return; }
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const slots = Array.from(inventory.querySelectorAll('.gadget-slot'));
+      const slot  = slots[num - 1];
+      if (!slot) return;
+      if (slot.dataset.gadget === 'moon') {
+        if (window.Moon.isDeployed()) { window.Moon.undeploy(); slot.classList.remove('deployed'); }
+        else                          { window.Moon.deploy();   slot.classList.add('deployed'); }
+      } else if (!slot.classList.contains('on-cooldown')) {
+        setActiveGadget(slot.dataset.gadget);
+      }
+    }
   });
 
   document.addEventListener('contextmenu', e => {
