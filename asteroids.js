@@ -153,6 +153,7 @@
       glowPh:   Math.random() * Math.PI * 2,
       hitFlash: 0,
       bounceCD: 0,
+      aaBounceCD: 0,
       swirl:    null,
       dead:     false,
       frozen:   0,
@@ -415,9 +416,9 @@
             ai.vx += imp * nx; ai.vy += imp * ny;
             aj.vx -= imp * nx; aj.vy -= imp * ny;
           }
-          if (ai.bounceCD <= 0 && aj.bounceCD <= 0) {
-            ai.bounceCD = 0.5;
-            aj.bounceCD = 0.5;
+          if (ai.aaBounceCD <= 0 && aj.aaBounceCD <= 0) {
+            ai.aaBounceCD = 0.5;
+            aj.aaBounceCD = 0.5;
             damageAsteroid(i, 1, ai.x, ai.y);
             damageAsteroid(j, 1, aj.x, aj.y);
           }
@@ -445,6 +446,7 @@
           a.thaw = { age: 0, maxAge: 1.5, vx: a.frozenVx, vy: a.frozenVy };
         }
         if (a.bounceCD > 0) a.bounceCD -= dt;
+        if (a.aaBounceCD > 0) a.aaBounceCD -= dt;
         const fship = window.Spaceship && window.Spaceship.get();
         if (fship && !fship.exploding && !fship.swirl) {
           const sdx = fship.x - a.x, sdy = fship.y - a.y;
@@ -495,6 +497,7 @@
       a.y += a.vy * dt;
 
       if (a.bounceCD > 0) a.bounceCD -= dt;
+      if (a.aaBounceCD > 0) a.aaBounceCD -= dt;
 
       // Shield collision
       if (g && window.ElectricField && window.ElectricField.isActive() && a.bounceCD <= 0) {
@@ -507,7 +510,7 @@
           a.y = g.y + ny * (shieldR + a.r * 0.75);
           const dot = a.vx * nx + a.vy * ny;
           if (dot < 0) {
-            const BURST = 450;
+            const BURST = 337;
             a.vx = (a.vx - 2 * dot * nx) * 0.7 + nx * BURST;
             a.vy = (a.vy - 2 * dot * ny) * 0.7 + ny * BURST;
             a.burst = { dvx: nx * BURST, dvy: ny * BURST, age: 0, maxAge: 2.0 };

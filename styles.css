@@ -238,18 +238,21 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .gadget-slot:hover .gadget-tooltip {
+  .gadget-slot:hover .gadget-tooltip,
+  .deployable-slot:hover .gadget-tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
 }
 
-.gadget-slot.show-tooltip .gadget-tooltip {
+.gadget-slot.show-tooltip .gadget-tooltip,
+.deployable-slot.show-tooltip .gadget-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 
-.gadget-slot.no-tooltip .gadget-tooltip {
+.gadget-slot.no-tooltip .gadget-tooltip,
+.deployable-slot.no-tooltip .gadget-tooltip {
   opacity: 0 !important;
   transform: translateX(-50%) translateY(6px) !important;
   transition: none !important;
@@ -796,6 +799,91 @@ body {
 }
 
 
+
+/* ── Deployable Inventory ── */
+#deployable-inventory,
+#deployable-inventory * { cursor: pointer; }
+
+#deployable-inventory {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--slot-gap);
+  padding: clamp(7px, 1.8vmin, 10px) clamp(10px, 2.6vmin, 14px);
+  background: rgba(7, 4, 26, 0.84);
+  border: 1px solid rgba(0, 200, 255, 0.28);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(0, 180, 255, 0.14), inset 0 0 14px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.deployable-slot {
+  position: relative;
+  width: var(--slot-size);
+  height: var(--slot-size);
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: none;
+  flex-shrink: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#deployable-drone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 42% 38%, #001a20 0%, #000a12 62%);
+  box-shadow:
+    0 0 0 1px rgba(0, 245, 255, 0.32),
+    0 0 12px 4px rgba(0, 200, 255, 0.35),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+  transition: box-shadow 0.22s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #deployable-drone:hover {
+    box-shadow:
+      0 0 0 1px rgba(0, 245, 255, 0.65),
+      0 0 22px 7px rgba(0, 220, 255, 0.65),
+      inset 0 0 10px rgba(0, 0, 0, 0.92);
+  }
+}
+
+#deployable-drone.active {
+  box-shadow:
+    0 0 0 2px rgba(0, 245, 255, 0.95),
+    0 0 30px 12px rgba(0, 220, 255, 0.90),
+    inset 0 0 10px rgba(0, 0, 0, 0.92);
+}
+
+.deployable-drone-icon {
+  width:  calc(var(--slot-size) * 0.70);
+  height: calc(var(--slot-size) * 0.70);
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 4px rgba(0, 245, 255, 0.70))
+    drop-shadow(0 0 10px rgba(0, 200, 255, 0.40));
+  transition: filter 0.22s ease;
+}
+
+#deployable-drone.active .deployable-drone-icon {
+  filter:
+    drop-shadow(0 0 7px rgba(0, 245, 255, 0.95))
+    drop-shadow(0 0 16px rgba(0, 220, 255, 0.70));
+}
 
 /* ── Performance toggle switch ── */
 .perf-toggle {
