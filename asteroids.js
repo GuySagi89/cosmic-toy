@@ -408,6 +408,56 @@
       if (a.y - a.r < 0)  { a.y = a.r;     a.vy = Math.abs(a.vy); }
       if (a.y + a.r > H)  { a.y = H - a.r; a.vy = -Math.abs(a.vy); }
     }
+
+    // Grabbed asteroid acts as an immovable wall — pushes other asteroids and spaceship
+    if (grabbedAsteroid && !grabbedAsteroid.dead) {
+      const ga = grabbedAsteroid;
+
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i];
+        if (a === ga || a.dead || a.swirl) continue;
+        const dx = a.x - ga.x, dy = a.y - ga.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const nx = dx / dist, ny = dy / dist;
+        const minD = support2D(ga, -nx, -ny) + support2D(a, nx, ny);
+        if (dist < minD) {
+          a.x += nx * (minD - dist);
+          a.y += ny * (minD - dist);
+          const vn = a.vx * nx + a.vy * ny;
+          if (vn < 0) { a.vx -= 1.8 * vn * nx; a.vy -= 1.8 * vn * ny; }
+          const newVn = a.vx * nx + a.vy * ny;
+          if (newVn < 160) { a.vx += (160 - newVn) * nx; a.vy += (160 - newVn) * ny; }
+          if (a.bounceCD <= 0) {
+            a.bounceCD = 0.5;
+            spawnHitSparks(a, ga.x, ga.y);
+            a.hitFlash = 0.22;
+            ga.hitFlash = 0.22;
+          }
+        }
+      }
+
+      const ship = window.Spaceship && window.Spaceship.get();
+      if (ship && !ship.exploding && !ship.swirl) {
+        const sdx = ship.x - ga.x, sdy = ship.y - ga.y;
+        const sd = Math.hypot(sdx, sdy) || 1;
+        const minDist = ga.r * 0.75 + 14;
+        if (sd < minDist) {
+          const nx = sdx / sd, ny = sdy / sd;
+          ship.x = ga.x + nx * minDist;
+          ship.y = ga.y + ny * minDist;
+          const vn = ship.vx * nx + ship.vy * ny;
+          if (vn < 0) { ship.vx -= 1.8 * vn * nx; ship.vy -= 1.8 * vn * ny; }
+          const newVn = ship.vx * nx + ship.vy * ny;
+          if (newVn < 160) { ship.vx += (160 - newVn) * nx; ship.vy += (160 - newVn) * ny; }
+          if (ga.bounceCD <= 0) {
+            ga.bounceCD = 0.5;
+            window.Spaceship.hit(ship.x, ship.y, nx * 220, ny * 220);
+            spawnHitSparks(ga, ga.x, ga.y);
+            ga.hitFlash = 0.22;
+          }
+        }
+      }
+    }
   }
 
   // ── Draw ─────────────────────────────────────────────────────────
