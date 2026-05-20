@@ -649,8 +649,8 @@ body {
 }
 
 .gadget-hand-icon {
-  width: calc(var(--slot-size) * 0.60);
-  height: calc(var(--slot-size) * 0.60);
+  width: calc(var(--slot-size) * 0.80);
+  height: calc(var(--slot-size) * 0.80);
   pointer-events: none;
   filter: drop-shadow(0 0 4px rgba(180, 140, 255, 0.65));
   transition: filter 0.22s ease;
