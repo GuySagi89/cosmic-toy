@@ -223,13 +223,12 @@
 
       const ship = window.Spaceship && window.Spaceship.get();
       if (ship && !ship.exploding && Math.hypot(c.x - ship.x, c.y - ship.y) < 22) {
-        ship.hits += 5;
+        window.Spaceship.hit(c.x, c.y, c.vx, c.vy);
         spawnImpactDebris(c.x, c.y, c.vx, c.vy);
-        if (ship.hits >= 10) window.Spaceship.triggerExplosion();
         comets.splice(i, 1); continue;
       }
 
-      if (window.Asteroids && window.Asteroids.checkHit(c.x, c.y, 18, 1)) {
+      if (window.Asteroids && window.Asteroids.checkHit(c.x, c.y, 18, 'comet')) {
         spawnExplosion(c.x, c.y);
         comets.splice(i, 1); continue;
       }

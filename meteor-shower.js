@@ -177,7 +177,7 @@
           hit = true;
         }
 
-        if (!hit && window.Asteroids && window.Asteroids.checkHit(m.x, m.y, m.r * 2, 0.5)) {
+        if (!hit && window.Asteroids && window.Asteroids.checkHit(m.x, m.y, m.r * 2, 'meteor')) {
           spawnImpact(m.x, m.y, m.vx, m.vy);
           hit = true;
         }

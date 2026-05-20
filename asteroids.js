@@ -107,13 +107,8 @@
     const r  = rng(t.rMin, t.rMax);
     const ci = Math.floor(Math.random() * NEON.length);
 
-    let avx = vx, avy = vy;
-    if (avx == null) {
-      const ang = Math.random() * Math.PI * 2;
-      const spd = rng(t.sMin, t.sMax);
-      avx = Math.cos(ang) * spd;
-      avy = Math.sin(ang) * spd;
-    }
+    const avx = vx ?? 0;
+    const avy = vy ?? 0;
 
     // Slower base spin since 3D rotation is more visually busy
     const rotDir = Math.random() < 0.5 ? 1 : -1;
@@ -148,6 +143,7 @@
       ci,
       glowPh:   Math.random() * Math.PI * 2,
       hitFlash: 0,
+      frozen:   0,
       bounceCD: 0,
       swirl:    null,
       dead:     false,
@@ -263,13 +259,16 @@
       if (a.dead) { asteroids.splice(i, 1); continue; }
 
       a.hitFlash = Math.max(0, a.hitFlash - dt);
+      if (a.frozen > 0) a.frozen = Math.max(0, a.frozen - dt);
       a.glowPh   = (a.glowPh + dt * 1.7) % (Math.PI * 2);
 
-      // Advance 3D Euler angles
-      a.eulerX = (a.eulerX + a.eulerSpd.x * dt) % (Math.PI * 2);
-      a.eulerY = (a.eulerY + a.eulerSpd.y * dt) % (Math.PI * 2);
-      a.eulerZ = (a.eulerZ + a.eulerSpd.z * dt) % (Math.PI * 2);
-      a.rotation = a.eulerZ; // keep in sync for any external code that reads it
+      // Advance 3D Euler angles (paused while frozen)
+      if (a.frozen <= 0) {
+        a.eulerX = (a.eulerX + a.eulerSpd.x * dt) % (Math.PI * 2);
+        a.eulerY = (a.eulerY + a.eulerSpd.y * dt) % (Math.PI * 2);
+        a.eulerZ = (a.eulerZ + a.eulerSpd.z * dt) % (Math.PI * 2);
+        a.rotation = a.eulerZ;
+      }
 
       // BH swirl animation
       if (a.swirl) {
@@ -306,6 +305,15 @@
 
       a.x += a.vx * dt;
       a.y += a.vy * dt;
+
+      // Friction: coast to a stop after being knocked
+      if (Math.hypot(a.vx, a.vy) > 1) {
+        const decay = Math.pow(0.94, dt * 60);
+        a.vx *= decay;
+        a.vy *= decay;
+      } else {
+        a.vx = 0; a.vy = 0;
+      }
 
       if (a.bounceCD > 0) a.bounceCD -= dt;
 
@@ -461,7 +469,8 @@
   function drawAsteroid(a) {
     if (a.dead) return;
 
-    const nc      = NEON[a.ci];
+    const frozen  = a.frozen > 0;
+    const nc      = frozen ? { hex: '#d8f0ff', r: 216, g: 240, b: 255 } : NEON[a.ci];
     const glow    = 0.5 + Math.sin(a.glowPh) * 0.25;
     const hitFrac = Math.min(1, a.hitFlash / 0.22);
     const swFrac  = a.swirl ? Math.max(0, 1 - Math.pow(a.swirl.age / a.swirl.maxAge, 0.55)) : 1;
@@ -495,6 +504,16 @@
       const fg = Math.round(nc.g + (255 - nc.g) * hitFrac);
       const fb = Math.round(nc.b + (255 - nc.b) * hitFrac);
       ctx.fillStyle = `rgba(${fr},${fg},${fb},${0.45 + hitFrac * 0.40})`;
+      ctx.fill();
+    } else if (frozen) {
+      const grad = ctx.createRadialGradient(
+        -a.r * 0.25, -a.r * 0.30, 0,
+         a.r * 0.05,  a.r * 0.05, a.r * 1.10
+      );
+      grad.addColorStop(0,    'rgba(210, 240, 255, 0.72)');
+      grad.addColorStop(0.55, 'rgba(140, 190, 225, 0.58)');
+      grad.addColorStop(1,    'rgba(45,  100, 155, 0.68)');
+      ctx.fillStyle = grad;
       ctx.fill();
     } else {
       // Subtle radial fill: dark center, slightly lit on one side
@@ -612,7 +631,7 @@
 
   // ── Public API ────────────────────────────────────────────────────
 
-  function checkHit(x, y, hitR) {
+  function checkHit(x, y, hitR, source) {
     hitR = hitR ?? 10;
     for (let i = 0; i < asteroids.length; i++) {
       const a = asteroids[i];
@@ -620,6 +639,11 @@
       if (Math.hypot(x - a.x, y - a.y) < a.r + hitR) {
         spawnHitSparks(a, x, y);
         a.hitFlash = 0.22;
+        const dx = a.x - x, dy = a.y - y;
+        const d = Math.hypot(dx, dy) || 1;
+        a.vx += (dx / d) * 150;
+        a.vy += (dy / d) * 150;
+        if (source === 'comet') a.frozen = 4.0;
         return true;
       }
     }
@@ -631,7 +655,13 @@
     draw,
     spawnAt(x, y, tier) {
       const tiers = ['small', 'medium', 'large'];
-      asteroids.push(createAsteroid(x, y, tier || tiers[Math.floor(Math.random() * tiers.length)]));
+      const newTier = tier || tiers[Math.floor(Math.random() * tiers.length)];
+      const active = asteroids.filter(a => !a.dead);
+      if (active.length >= 5) {
+        spawnSplitFlash(active[0]);
+        active[0].dead = true;
+      }
+      asteroids.push(createAsteroid(x, y, newTier, 0, 0));
     },
     checkHit,
     getAll: () => asteroids,
