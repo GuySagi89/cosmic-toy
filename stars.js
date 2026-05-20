@@ -442,6 +442,9 @@
     window.MeteorShower && window.MeteorShower.update(dt);
     window.MeteorShower && window.MeteorShower.draw();
 
+    window.GodHandTrail && window.GodHandTrail.update(dt);
+    window.GodHandTrail && window.GodHandTrail.draw(ctx);
+
     if (shooting) {
       const tailX = shooting.x - shooting.dx * shooting.tail;
       const tailY = shooting.y - shooting.dy * shooting.tail;

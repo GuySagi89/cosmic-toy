@@ -324,10 +324,10 @@
       }
       if (godHandGrabType) {
         if (cursorEl) cursorEl.innerHTML = HAND_GRAB_SVG;
-        overlay.setPointerCapture(e.pointerId);
       } else {
-        isDragging = false;
+        window.GodHandTrail.startAt(e.clientX, e.clientY);
       }
+      overlay.setPointerCapture(e.pointerId);
     }
   }
 
@@ -367,10 +367,15 @@
         showDragOrigin(e.clientX, e.clientY, 'meteor-shower');
       }
       updateDragFeedback(e.clientX, e.clientY);
-    } else if (activeGadget === 'god-hand' && godHandGrabType) {
-      if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabMove(e.clientX, e.clientY);
-      else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabMove(e.clientX, e.clientY);
-      else if (godHandGrabType === 'globe')     window.Globe?.onMove(e.clientX, e.clientY);
+    } else if (activeGadget === 'god-hand') {
+      if (godHandGrabType) {
+        if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabMove(e.clientX, e.clientY);
+        else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabMove(e.clientX, e.clientY);
+        else if (godHandGrabType === 'globe')     window.Globe?.onMove(e.clientX, e.clientY);
+      } else {
+        const pts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        for (const pt of pts) window.GodHandTrail.spawnAt(pt.clientX, pt.clientY);
+      }
     }
   }
 
@@ -513,4 +518,167 @@
   // Fallback: catch pointer release even when the overlay loses capture (e.g. after contextmenu)
   window.addEventListener('pointerup',     onUp);
   window.addEventListener('pointercancel', onCancel);
+
+  // ── God Hand Trail ────────────────────────────────────────────────
+  const TRAIL_NEON_10 = [
+    { hex: '#00f5ff', r:   0, g: 245, b: 255 },  // cyan
+    { hex: '#ff00dc', r: 255, g:   0, b: 220 },  // hot pink
+    { hex: '#0088ff', r:   0, g: 136, b: 255 },  // electric blue
+    { hex: '#00ff6b', r:   0, g: 255, b: 107 },  // lime green
+    { hex: '#bf00ff', r: 191, g:   0, b: 255 },  // purple
+    { hex: '#ff6600', r: 255, g: 102, b:   0 },  // orange
+    { hex: '#aaff00', r: 170, g: 255, b:   0 },  // yellow-green
+    { hex: '#ff0044', r: 255, g:   0, b:  68 },  // red
+    { hex: '#00ffcc', r:   0, g: 255, b: 204 },  // teal
+    { hex: '#ffd700', r: 255, g: 215, b:   0 },  // gold
+  ];
+  const TRAIL_SPACING = 7;
+  let trailParticles = [];
+  let trailCurrentNc = TRAIL_NEON_10[0];
+  let trailPrevX = 0, trailPrevY = 0, trailAccum = 0;
+
+  function spawnTrailParticles(x, y) {
+    if (trailParticles.length > 800) return;
+    const nc      = trailCurrentNc;
+    const scatter = 12;
+
+    const dustCount = 5 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < dustCount; i++) {
+      trailParticles.push({
+        type: 'dust',
+        x: x + (Math.random() - 0.5) * scatter,
+        y: y + (Math.random() - 0.5) * scatter,
+        vx: (Math.random() - 0.5) * 28,
+        vy: -4 - Math.random() * 16,
+        nc,
+        r: 0.5 + Math.random() * 1.3,
+        age: 0, maxLife: 0.5 + Math.random() * 0.7,
+      });
+    }
+
+    trailParticles.push({
+      type: 'glow',
+      x: x + (Math.random() - 0.5) * 8,
+      y: y + (Math.random() - 0.5) * 8,
+      vx: (Math.random() - 0.5) * 14,
+      vy: -2 - Math.random() * 10,
+      nc,
+      r: 2.5 + Math.random() * 3.5,
+      age: 0, maxLife: 0.8 + Math.random() * 0.9,
+    });
+
+    if (Math.random() < 0.35) {
+      trailParticles.push({
+        type: 'glow',
+        x: x + (Math.random() - 0.5) * 14,
+        y: y + (Math.random() - 0.5) * 14,
+        vx: (Math.random() - 0.5) * 10,
+        vy: -1 - Math.random() * 8,
+        nc,
+        r: 1.5 + Math.random() * 2.5,
+        age: 0, maxLife: 0.7 + Math.random() * 0.8,
+      });
+    }
+
+    if (Math.random() < 0.22) {
+      trailParticles.push({
+        type: 'spark',
+        x: x + (Math.random() - 0.5) * scatter,
+        y: y + (Math.random() - 0.5) * scatter,
+        vx: (Math.random() - 0.5) * 18,
+        vy: -6 - Math.random() * 22,
+        nc,
+        r: 1.2 + Math.random() * 1.4,
+        age: 0, maxLife: 0.4 + Math.random() * 0.5,
+      });
+    }
+  }
+
+  window.GodHandTrail = {
+    startAt(x, y) {
+      trailCurrentNc = TRAIL_NEON_10[Math.floor(Math.random() * TRAIL_NEON_10.length)];
+      trailPrevX = x; trailPrevY = y; trailAccum = 0;
+      for (let i = 0; i < 8; i++) spawnTrailParticles(x, y);
+    },
+    spawnAt(x, y) {
+      const dx = x - trailPrevX, dy = y - trailPrevY;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.5) return;
+      trailAccum += dist;
+      while (trailAccum >= TRAIL_SPACING) {
+        trailAccum -= TRAIL_SPACING;
+        const frac = 1 - trailAccum / Math.max(dist, 0.001);
+        spawnTrailParticles(trailPrevX + dx * frac, trailPrevY + dy * frac);
+      }
+      trailPrevX = x; trailPrevY = y;
+    },
+    update(dt) {
+      for (let i = trailParticles.length - 1; i >= 0; i--) {
+        const p = trailParticles[i];
+        p.age += dt;
+        if (p.age >= p.maxLife) { trailParticles.splice(i, 1); continue; }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vx *= Math.pow(0.88, dt * 60);
+        p.vy *= Math.pow(0.90, dt * 60);
+      }
+    },
+    draw(ctx) {
+      if (!trailParticles.length) return;
+      for (const p of trailParticles) {
+        const lifeFrac  = p.age / p.maxLife;
+        const fade      = Math.pow(1 - lifeFrac, 0.65);
+        const sizeScale = Math.pow(1 - lifeFrac, 0.7);
+        if (fade < 0.015) continue;
+
+        if (p.type === 'glow') {
+          const drawR = p.r * 3.2 * sizeScale;
+          ctx.save();
+          ctx.globalAlpha = fade * 0.88;
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, drawR);
+          grad.addColorStop(0,    'rgba(255,255,240,0.95)');
+          grad.addColorStop(0.18, `rgba(${p.nc.r},${p.nc.g},${p.nc.b},0.9)`);
+          grad.addColorStop(0.55, `rgba(${p.nc.r},${p.nc.g},${p.nc.b},0.35)`);
+          grad.addColorStop(1,    `rgba(${p.nc.r},${p.nc.g},${p.nc.b},0)`);
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, drawR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+        } else if (p.type === 'dust') {
+          const drawR = p.r * sizeScale;
+          if (drawR < 0.1) continue;
+          ctx.save();
+          ctx.globalAlpha = fade;
+          ctx.shadowColor = p.nc.hex;
+          ctx.shadowBlur  = drawR * 5;
+          ctx.fillStyle   = `rgba(${p.nc.r},${p.nc.g},${p.nc.b},1)`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, drawR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+        } else if (p.type === 'spark') {
+          const sr = p.r * 2.8 * sizeScale;
+          if (sr < 0.15) continue;
+          ctx.save();
+          ctx.globalAlpha = fade;
+          ctx.translate(p.x, p.y);
+          ctx.shadowColor = p.nc.hex;
+          ctx.shadowBlur  = sr * 4;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineCap     = 'round';
+          ctx.lineWidth   = p.r * 0.55 * sizeScale;
+          ctx.beginPath(); ctx.moveTo(-sr, 0);  ctx.lineTo(sr, 0);  ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0,  -sr); ctx.lineTo(0,  sr); ctx.stroke();
+          ctx.lineWidth = p.r * 0.35 * sizeScale;
+          const d = sr * 0.65;
+          ctx.beginPath(); ctx.moveTo(-d, -d); ctx.lineTo(d,  d);  ctx.stroke();
+          ctx.beginPath(); ctx.moveTo( d, -d); ctx.lineTo(-d, d);  ctx.stroke();
+          ctx.restore();
+        }
+      }
+    },
+  };
 })();
