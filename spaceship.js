@@ -6,8 +6,11 @@
   let spaceship    = null;
   let shipImpacts  = [];
   let shipDebris   = [];
-  let lasers       = [];
-  let laserImpacts = [];
+  let tractorTarget  = null;
+  let tractorActive  = false;
+  let tractorOffsetX = 0;
+  let tractorOffsetY = 0;
+  let tractorPhase   = 0;
   let shipGrabbed  = false;
   let shipGrabHist = [];
   let shipNeonTint = null;
@@ -173,6 +176,8 @@
 
   function triggerShipExplosion() {
     if (!spaceship || spaceship.exploding) return;
+    tractorActive = false;
+    tractorTarget = null;
     spaceship.active        = false;
     spaceship.exploding     = true;
     spaceship.explodeAge    = 0;
@@ -255,58 +260,22 @@
       d.y     += d.vy * dt;
       d.angle += d.angVel * dt;
     }
-    for (let i = laserImpacts.length - 1; i >= 0; i--) {
-      laserImpacts[i].age += dt;
-      if (laserImpacts[i].age >= laserImpacts[i].maxAge) laserImpacts.splice(i, 1);
-    }
-
-    if (lasers.length > 0) {
-      const lGlobeEl = document.getElementById('globe-canvas');
-      const lgr      = lGlobeEl ? lGlobeEl.getBoundingClientRect() : null;
-      const lmoon    = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
-      for (let i = lasers.length - 1; i >= 0; i--) {
-        const l   = lasers[i];
-        l.age    += dt;
-        l.trail.unshift({ x: l.x, y: l.y });
-        if (l.trail.length > 6) l.trail.pop();
-        l.x += l.vx * dt;
-        l.y += l.vy * dt;
-
-        let lhit = false;
-        const lspd = Math.hypot(l.vx, l.vy);
-        const lnx  = l.vx / lspd, lny = l.vy / lspd;
-
-        if (lgr) {
-          const gcx = lgr.left + lgr.width  * 0.5;
-          const gcy = lgr.top  + lgr.height * 0.5;
-          if (Math.hypot(l.x - gcx, l.y - gcy) < lgr.width * 0.22) {
-            window.dispatchEvent(new CustomEvent('comet-globe-impact', {
-              detail: { x: l.x, y: l.y, vx: lnx * 280, vy: lny * 280, source: 'laser' }
-            }));
-            laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
-            lhit = true;
-          }
-        }
-        if (!lhit && lmoon && Math.hypot(l.x - lmoon.x, l.y - lmoon.y) < lmoon.r * 1.3) {
-          window.dispatchEvent(new CustomEvent('comet-moon-impact', {
-            detail: { x: l.x, y: l.y, vx: lnx * 280, vy: lny * 280, source: 'laser' }
-          }));
-          laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
-          lhit = true;
-        }
-        if (!lhit && window.Asteroids && window.Asteroids.checkHit(l.x, l.y, 6, 1)) {
-          laserImpacts.push({ x: l.x, y: l.y, age: 0, maxAge: 0.28 });
-          lhit = true;
-        }
-        if (lhit || l.age > 3.5 ||
-            l.x < -60 || l.x > canvas.width  + 60 ||
-            l.y < -60 || l.y > canvas.height + 60) {
-          lasers.splice(i, 1);
-        }
-      }
-    }
+    tractorPhase = (tractorPhase + dt * 5) % (Math.PI * 2);
 
     if (!spaceship) return;
+
+    // Rigidly carry the tractor target at its locked offset from the ship
+    if (tractorActive && tractorTarget) {
+      if (tractorTarget.dead || tractorTarget.swirl) {
+        tractorTarget = null;
+        tractorActive = false;
+      } else {
+        tractorTarget.x  = spaceship.x + tractorOffsetX;
+        tractorTarget.y  = spaceship.y + tractorOffsetY;
+        tractorTarget.vx = 0;
+        tractorTarget.vy = 0;
+      }
+    }
 
     if (spaceship.exploding) {
       spaceship.explodeAge += dt;
@@ -445,73 +414,111 @@
 
   }
 
-  function drawLasers() {
+  function drawTractorBeam() {
+    if (!tractorActive || !tractorTarget || !spaceship || spaceship.exploding) return;
+    const a = tractorTarget;
+    if (a.dead) return;
+
+    const sx  = spaceship.x, sy  = spaceship.y;
+    const ax  = a.x,         ay  = a.y;
+    const ddx = ax - sx,     ddy = ay - sy;
+    const dist = Math.hypot(ddx, ddy);
+    if (dist < 2) return;
+
+    const nx = ddx / dist, ny = ddy / dist;
+    const px = -ny,        py = nx;
     const gs = window.gadgetScale || 1;
+    const ph = tractorPhase;
 
-    for (const imp of laserImpacts) {
-      const frac = imp.age / imp.maxAge;
-      if (frac < 0.4) {
-        const f2 = frac / 0.4;
-        const r  = (1 - f2) * 22 * gs;
-        const fg = ctx.createRadialGradient(imp.x, imp.y, 0, imp.x, imp.y, r);
-        fg.addColorStop(0,   `rgba(255, 255, 200, ${(1 - f2) * 0.95})`);
-        fg.addColorStop(0.3, `rgba(255, 80,  20, ${(1 - f2) * 0.70})`);
-        fg.addColorStop(1,   'rgba(180, 0, 0, 0)');
-        ctx.fillStyle = fg;
-        ctx.beginPath();
-        ctx.arc(imp.x, imp.y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.save();
-      ctx.globalAlpha = (1 - frac) * 0.85;
-      ctx.strokeStyle = frac < 0.5 ? '#ff6030' : '#cc1000';
-      ctx.lineWidth   = ((1 - frac) * 2.5 + 0.3) * gs;
-      ctx.shadowColor = 'rgba(255, 60, 0, 1)';
-      ctx.shadowBlur  = 12 * (1 - frac);
-      ctx.beginPath();
-      ctx.arc(imp.x, imp.y, Math.max(0.5, frac * 30 * gs), 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+    // Outer soft glow
+    ctx.save();
+    ctx.globalAlpha = 0.14 + Math.sin(ph * 1.5) * 0.04;
+    ctx.strokeStyle = '#00f5ff';
+    ctx.lineWidth   = 14 * gs;
+    ctx.shadowColor = '#00f5ff';
+    ctx.shadowBlur  = 28;
+    ctx.lineCap     = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ax, ay);
+    ctx.stroke();
+    ctx.restore();
+
+    // Sine-wave core beam
+    const segs = Math.max(12, Math.floor(dist / 8));
+    ctx.save();
+    ctx.shadowColor = '#00f5ff';
+    ctx.shadowBlur  = 10;
+    ctx.globalAlpha = 0.65 + Math.sin(ph * 2) * 0.12;
+    ctx.strokeStyle = '#00f5ff';
+    ctx.lineWidth   = 2 * gs;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= segs; i++) {
+      const bt   = i / segs;
+      const env  = Math.sin(bt * Math.PI);
+      const wave = Math.sin(bt * Math.PI * 8 - ph * 3.5) * 6 * env;
+      const bx   = sx + ddx * bt + px * wave;
+      const by_  = sy + ddy * bt + py * wave;
+      if (i === 0) ctx.moveTo(bx, by_);
+      else         ctx.lineTo(bx, by_);
     }
+    ctx.stroke();
+    ctx.restore();
 
-    for (const l of lasers) {
-      const pts = [{ x: l.x, y: l.y }, ...l.trail];
-      if (pts.length >= 2) {
-        ctx.save();
-        ctx.lineCap = 'round';
-        for (let i = 0; i < pts.length - 1; i++) {
-          const t = 1 - i / pts.length;
-          ctx.globalAlpha = t * 0.88;
-          ctx.strokeStyle = i < 2 ? 'rgba(255, 200, 120, 1)' : 'rgba(255, 30, 0, 0.85)';
-          ctx.lineWidth   = Math.max(0.5, (2.8 - i * 0.35) * gs);
-          ctx.shadowColor = 'rgba(255, 60, 0, 1)';
-          ctx.shadowBlur  = 14 * t;
-          ctx.beginPath();
-          ctx.moveTo(pts[i].x, pts[i].y);
-          ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+    // Energy blobs traveling ship → asteroid
+    for (let i = 0; i < 4; i++) {
+      const blobT = ((i / 4) + (ph / (Math.PI * 2)) * 0.9) % 1;
+      const bx    = sx + ddx * blobT;
+      const by_   = sy + ddy * blobT;
+      const alpha = Math.sin(blobT * Math.PI) * 0.9;
+      if (alpha < 0.05) continue;
+      const blobR = 5 * gs;
       ctx.save();
-      ctx.shadowColor = 'rgba(255, 60, 0, 1)';
-      ctx.shadowBlur  = 20 * gs;
-      const hg = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, 7 * gs);
-      hg.addColorStop(0,   'rgba(255, 255, 255, 1)');
-      hg.addColorStop(0.4, 'rgba(255, 100, 30, 0.85)');
-      hg.addColorStop(1,   'rgba(200, 0, 0, 0)');
-      ctx.fillStyle = hg;
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = '#00f5ff';
+      ctx.shadowBlur  = 14;
+      const bg = ctx.createRadialGradient(bx, by_, 0, bx, by_, blobR * 2);
+      bg.addColorStop(0,    'rgba(220, 255, 255, 1)');
+      bg.addColorStop(0.35, 'rgba(0, 245, 255, 0.9)');
+      bg.addColorStop(1,    'rgba(0, 245, 255, 0)');
+      ctx.fillStyle = bg;
       ctx.beginPath();
-      ctx.arc(l.x, l.y, 7 * gs, 0, Math.PI * 2);
+      ctx.arc(bx, by_, blobR * 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
+
+    // Ship-end pulsing ring
+    ctx.save();
+    ctx.globalAlpha = 0.55 + Math.sin(ph * 3) * 0.2;
+    ctx.shadowColor = '#00f5ff';
+    ctx.shadowBlur  = 20;
+    ctx.strokeStyle = '#00f5ff';
+    ctx.lineWidth   = 1.8 * gs;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 16 * gs, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Asteroid-end pulsing ring
+    ctx.save();
+    ctx.globalAlpha = 0.45 + Math.sin(ph * 3 + 1.2) * 0.2;
+    ctx.shadowColor = '#00f5ff';
+    ctx.shadowBlur  = 18;
+    ctx.strokeStyle = '#00f5ff';
+    ctx.lineWidth   = 2 * gs;
+    ctx.beginPath();
+    ctx.arc(ax, ay, a.r * 1.1, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawSpaceship() {
     drawShipImpacts();
     drawShipDebris();
-    drawLasers();
+    drawTractorBeam();
     if (!spaceship) return;
     ctx.save();
 
@@ -704,19 +711,28 @@
     if (spaceship) spaceship.active = false;
   };
 
-  window.fireSpaceshipLaser = function(targetX, targetY) {
+  window.activateTractorBeam = function(targetX, targetY) {
     if (!spaceship || spaceship.exploding || spaceship.swirl) return;
-    const dx   = targetX - spaceship.x;
-    const dy   = targetY - spaceship.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 1) return;
-    const nx = dx / dist, ny = dy / dist;
-    spaceship.angle = Math.atan2(ny, nx) + Math.PI / 2;
-    lasers.push({
-      x: spaceship.x + nx * 18, y: spaceship.y + ny * 18,
-      vx: nx * 1100, vy: ny * 1100,
-      age: 0, trail: [],
-    });
+    if (tractorActive) {
+      tractorActive = false;
+      tractorTarget = null;
+      return;
+    }
+    if (!window.Asteroids) return;
+    const allAsteroids = window.Asteroids.getAll();
+    let nearest = null;
+    let nearestDist = 300;
+    for (const a of allAsteroids) {
+      if (a.dead || a.swirl) continue;
+      const d = Math.hypot(a.x - targetX, a.y - targetY);
+      if (d < nearestDist) { nearestDist = d; nearest = a; }
+    }
+    if (nearest) {
+      tractorTarget  = nearest;
+      tractorOffsetX = nearest.x - spaceship.x;
+      tractorOffsetY = nearest.y - spaceship.y;
+      tractorActive  = true;
+    }
   };
 
   window.Spaceship = {

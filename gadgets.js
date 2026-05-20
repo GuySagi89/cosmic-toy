@@ -407,7 +407,7 @@
     if (activeGadget === 'spaceship') {
       if (spaceshipTouchPending) {
         spaceshipTouchPending = false;
-        window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
+        window.activateTractorBeam && window.activateTractorBeam(e.clientX, e.clientY);
       } else {
         if (cursorEl) cursorEl.classList.remove('pressing');
         window.releaseSpaceship && window.releaseSpaceship();
@@ -526,7 +526,7 @@
   document.addEventListener('contextmenu', e => {
     if (activeGadget === 'spaceship') {
       e.preventDefault();
-      window.fireSpaceshipLaser && window.fireSpaceshipLaser(e.clientX, e.clientY);
+      window.activateTractorBeam && window.activateTractorBeam(e.clientX, e.clientY);
     }
   });
 
