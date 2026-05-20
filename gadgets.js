@@ -24,9 +24,14 @@
 
   const SHIP_SVG     = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
   const ASTEROID_SVG = '<svg class="gadget-cursor-asteroid-svg" viewBox="-20 -20 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-18 10,-13 17,-4 15,9 6,17 -7,16 -16,7 -15,-6 -8,-16" fill="rgba(0,28,32,0.85)" stroke="#00f5ff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="3" cy="-4" r="2.5" fill="rgba(0,245,255,0.12)" stroke="#00f5ff" stroke-width="0.8"/></svg>';
-  const HAND_OPEN_SVG = '<svg class="gadget-cursor-hand-svg" viewBox="-13 -21 26 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="-10" y="-21" width="4" height="13" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="-5" y="-23" width="4" height="15" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="1" y="-21" width="4" height="13" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="6" y="-17" width="4" height="10" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="-13" y="-9" width="6.5" height="4" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" transform="rotate(15 -13 -9)"/><path d="M -11,-8 L 10,-8 Q 12,-8 12,8 Q 12,18 6,18 Q 0,18 -4,18 Q -12,18 -12,8 Q -12,-8 -11,-8 Z" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/></svg>';
-  const HAND_GRAB_SVG = '<svg class="gadget-cursor-hand-svg" viewBox="-13 -14 26 34" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M -11,-13 Q -8.5,-15 -6,-13 Q -3,-15 0,-13 Q 3,-15 6,-13 Q 8.5,-15 11,-13 L 12,-1 L -12,-1 Z" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><path d="M -12,-2 Q -16,-1 -16,4 Q -16,9 -12,10 Z" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><rect x="-12" y="-2" width="24" height="16" rx="5" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/></svg>';
+  const _HAMSA_BODY = 'M 0,-30 Q 2.5,-30 2.5,-27 L 2.5,-14 Q 3.5,-10 5,-14 L 5,-25 Q 5,-28 7.5,-28 Q 10,-28 10,-25 L 10,-14 Q 12,-10 12,-5 Q 13,-1 17,3 Q 16,9 13,11 Q 10,15 7,16 Q 3,17 0,17 Q -3,17 -7,16 Q -10,15 -13,11 Q -16,9 -17,3 Q -13,-1 -12,-5 Q -12,-10 -10,-14 L -10,-25 Q -10,-28 -7.5,-28 Q -5,-28 -5,-25 L -5,-14 Q -3.5,-10 -2.5,-14 L -2.5,-27 Q -2.5,-30 0,-30 Z';
+  const _HAMSA_NODES = '<line x1="0" y1="-7" x2="0" y2="-3" stroke="#ffdd55" stroke-width="0.9"/><circle cx="0" cy="-8.5" r="1.1" fill="#ffdd55"/><line x1="-5.5" y1="-2" x2="-2" y2="0.5" stroke="#ffdd55" stroke-width="0.9"/><circle cx="-6.5" cy="-2.5" r="1" fill="#ffdd55"/><line x1="5.5" y1="-2" x2="2" y2="0.5" stroke="#ffdd55" stroke-width="0.9"/><circle cx="6.5" cy="-2.5" r="1" fill="#ffdd55"/>';
+  const _HAMSA_WRAP  = (eye) => `<svg class="gadget-cursor-hand-svg" viewBox="-18 -31 36 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${_HAMSA_BODY}" fill="#b8780a" stroke="#ffdd55" stroke-width="1.3" stroke-linejoin="round"/>${_HAMSA_NODES}${eye}</svg>`;
+  const HAND_OPEN_SVG = _HAMSA_WRAP('<path d="M -5.5,3 Q -2,0 0,0 Q 2,0 5.5,3 Q 2,6 0,6 Q -2,6 -5.5,3 Z" fill="none" stroke="#ffdd55" stroke-width="1.1"/><circle cx="0" cy="3" r="2.2" fill="none" stroke="#ffdd55" stroke-width="0.9"/><circle cx="0" cy="3" r="1" fill="#3a1e00"/>');
+  const HAND_GRAB_SVG = _HAMSA_WRAP('<path d="M -5.5,3 Q 0,7 5.5,3" fill="none" stroke="#ffdd55" stroke-width="1.5" stroke-linecap="round"/>');
   let godHandGrabType = null;
+
+  { const s = document.createElement('style'); s.textContent = '@keyframes _gh_rb{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}.gadget-cursor--god-hand.rainbow{animation:_gh_rb 1.4s linear infinite}'; document.head.appendChild(s); }
 
   function moveCursor(x, y) {
     if (!cursorEl) return;
@@ -261,12 +266,15 @@
       if (activeGadget === 'spaceship') {
         if (cursorEl) cursorEl.classList.remove('pressing');
         window.releaseSpaceship && window.releaseSpaceship();
-      } else if (activeGadget === 'god-hand' && godHandGrabType) {
-        if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabRelease();
-        else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabRelease();
-        else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
-        godHandGrabType = null;
-        if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
+      } else if (activeGadget === 'god-hand') {
+        if (godHandGrabType) {
+          if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabRelease();
+          else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabRelease();
+          else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
+          godHandGrabType = null;
+          if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
+        }
+        if (cursorEl) cursorEl.classList.remove('rainbow');
       }
     }
 
@@ -327,6 +335,7 @@
       } else {
         window.GodHandTrail.startAt(e.clientX, e.clientY);
       }
+      if (cursorEl) cursorEl.classList.add('rainbow');
       overlay.setPointerCapture(e.pointerId);
     }
   }
@@ -452,6 +461,7 @@
         godHandGrabType = null;
         if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
       }
+      if (cursorEl) cursorEl.classList.remove('rainbow');
     }
   }
 
@@ -466,12 +476,15 @@
     if (activeGadget === 'spaceship') {
       if (cursorEl) cursorEl.classList.remove('pressing');
       window.releaseSpaceship && window.releaseSpaceship();
-    } else if (activeGadget === 'god-hand' && godHandGrabType) {
-      if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabCancel();
-      else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabCancel();
-      else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
-      godHandGrabType = null;
-      if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
+    } else if (activeGadget === 'god-hand') {
+      if (godHandGrabType) {
+        if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabCancel();
+        else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabCancel();
+        else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
+        godHandGrabType = null;
+        if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
+      }
+      if (cursorEl) cursorEl.classList.remove('rainbow');
     }
   }
 
