@@ -202,6 +202,7 @@
       hideDragFeedback();
     }
 
+    if (activeGadget === 'god-hand') window.Globe?.onHoverLeave();
     activeGadget = (activeGadget === type) ? null : type;
 
     inventory.querySelectorAll('.gadget-slot').forEach(s => {
@@ -340,6 +341,7 @@
         ship._aimY = e.clientY;
       }
     }
+    if (activeGadget === 'god-hand') window.Globe?.onHover(e.clientX, e.clientY);
     if (!isDragging) return;
 
     if (activeGadget === 'spaceship') {

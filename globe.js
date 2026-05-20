@@ -436,6 +436,14 @@
         if (window.Moon.isDragging()) window.Moon.drag(x, y);
         mouseX = x; mouseY = y;
       },
+      onHover(sx, sy) {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        mouseX = Math.max(0, Math.min(W, (sx - rect.left) * (W / rect.width)));
+        mouseY = Math.max(0, Math.min(H, (sy - rect.top)  * (H / rect.height)));
+        mouseInside = true;
+      },
+      onHoverLeave() { mouseX = -9999; mouseY = -9999; mouseInside = false; },
       onRelease() { onRelease(); window.Moon.release(); },
       isDragging() { return dragVertex !== null || (window.Moon && window.Moon.isDragging()); },
     };
@@ -452,8 +460,6 @@
 
       if (window.Moon.isDragging()) window.Moon.drag(x, y);
 
-      mouseX = x;
-      mouseY = y;
       if (e.buttons === 0) updateCursor();
     });
 
