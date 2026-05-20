@@ -302,11 +302,12 @@
           });
         }
       } else {
-        // Meteors / spaceship just nudge the orbit
+        // Nudge the orbit: immediate angle displacement + speed change
         const tangX   = -Math.sin(moonOrbitAngle);
         const tangY   = -Math.cos(moonOrbitAngle) * Math.sin(MOON_ORBIT_TILT);
         const tangLen = Math.hypot(tangX, tangY) || 1;
         const proj    = (vx * tangX + vy * tangY) / (speed * tangLen);
+        moonOrbitAngle += proj * 0.22 * sf;
         moonOrbitSpeed += proj * 0.08 * sf;
       }
     });
