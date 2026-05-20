@@ -153,6 +153,7 @@
       bounceCD: 0,
       swirl:    null,
       dead:     false,
+      neonTint: null,
     };
   }
 
@@ -662,6 +663,22 @@
 
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+
+    if (a.neonTint) {
+      const age = (Date.now() - a.neonTint.startTime) / 1000;
+      const fa = age < 2.0 ? 1.0 : 1.0 - (age - 2.0) / 0.6;
+      if (fa <= 0) { a.neonTint = null; }
+      else {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = fa * 0.6;
+        const ng = ctx.createRadialGradient(0, 0, 0, 0, 0, a.r * 1.3);
+        ng.addColorStop(0, `rgba(${a.neonTint.r},${a.neonTint.g},${a.neonTint.b},0.9)`);
+        ng.addColorStop(1, `rgba(${a.neonTint.r},${a.neonTint.g},${a.neonTint.b},0)`);
+        ctx.fillStyle = ng; ctx.beginPath(); ctx.arc(0, 0, a.r * 1.3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
     ctx.restore();
 
   }
@@ -822,6 +839,14 @@
       grabbedAsteroid = null;
     },
     isGrabbing() { return grabbedAsteroid !== null; },
+    applyNeonTintAt(x, y, r, g, b) {
+      for (const a of asteroids) {
+        if (a.dead || a.swirl) continue;
+        if (Math.hypot(x - a.x, y - a.y) < a.r + 12) {
+          a.neonTint = { r, g, b, startTime: Date.now() };
+        }
+      }
+    },
     hoverTarget(sx, sy) {
       for (const a of asteroids) {
         if (a.dead || a.swirl) continue;

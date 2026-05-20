@@ -41,6 +41,7 @@
   let ripple           = null;
   let snapStartTime    = 0;
   let frostPatches     = [];
+  let neonTouches      = [];
 
   const vertices       = [];
   const sortedVertices = [];
@@ -314,6 +315,66 @@
   }
 
 
+  const TOUCH_HOLD     = 2.0;   // seconds at full color
+  const TOUCH_FADE     = 0.6;   // seconds to fade out after hold
+  const TOUCH_LIFETIME = TOUCH_HOLD + TOUCH_FADE;
+  const TOUCH_R        = 0.22;  // ~12° angular radius — covers the target polygon + soft edge
+
+  function drawGlobeNeonTouch(backOnly) {
+    const now = Date.now();
+    for (let i = neonTouches.length - 1; i >= 0; i--) {
+      if ((now - neonTouches[i].startTime) / 1000 >= TOUCH_LIFETIME) neonTouches.splice(i, 1);
+    }
+    if (!neonTouches.length) return;
+
+    const cosR = Math.cos(rotY);
+    const sinR = Math.sin(rotY);
+
+    for (let lat = 0; lat < LAT_STEPS; lat++) {
+      for (let lon = 0; lon < LON_STEPS; lon++) {
+        const v00 = grid[lat][lon];
+        const v10 = grid[lat + 1][lon];
+        const v11 = grid[lat + 1][(lon + 1) % LON_STEPS];
+        const v01 = grid[lat][(lon + 1) % LON_STEPS];
+
+        const fcx = (v00.x0 + v10.x0 + v11.x0 + v01.x0) * 0.25;
+        const fcy = (v00.y0 + v10.y0 + v11.y0 + v01.y0) * 0.25;
+        const fcz = (v00.z0 + v10.z0 + v11.z0 + v01.z0) * 0.25;
+
+        const rfcz  = -fcx * sinR + fcz * cosR;
+        const isBack = rfcz > 0;
+        if (isBack !== backOnly) continue;
+
+        const depthFade = isBack ? Math.max(0, 1 - rfcz / R) : 1.0;
+        const fcLen = Math.sqrt(fcx*fcx + fcy*fcy + fcz*fcz) || 1;
+
+        let maxW = 0, tr = 0, tg = 0, tb = 0;
+        for (const t of neonTouches) {
+          const age = (now - t.startTime) / 1000;
+          const fa  = age < TOUCH_HOLD ? 1.0 : 1.0 - (age - TOUCH_HOLD) / TOUCH_FADE;
+          if (fa <= 0) continue;
+          // t.ox/oy/oz are normalised to length R, so dot / (R * fcLen) = cos(angle)
+          const dot   = (t.ox * fcx + t.oy * fcy + t.oz * fcz) / (R * fcLen);
+          const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+          if (angle < TOUCH_R) {
+            const w = (1 - angle / TOUCH_R) * fa * depthFade;
+            if (w > maxW) { maxW = w; tr = t.r; tg = t.g; tb = t.b; }
+          }
+        }
+        if (maxW < 0.02) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(v00.projX + v00.driftX, v00.projY + v00.driftY);
+        ctx.lineTo(v10.projX + v10.driftX, v10.projY + v10.driftY);
+        ctx.lineTo(v11.projX + v11.driftX, v11.projY + v11.driftY);
+        ctx.lineTo(v01.projX + v01.driftX, v01.projY + v01.driftY);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${tr},${tg},${tb},${(maxW * 0.80).toFixed(3)})`;
+        ctx.fill();
+      }
+    }
+  }
+
   function tick() {
     window.Moon.update();
     const moon = window.Moon.getPos();
@@ -333,16 +394,20 @@
     if (!window.Moon.isDragging() && moon.mz > 0) {
       // Moon is behind the globe — draw first so globe renders on top
       window.Moon.draw();
-      drawGlobeFrost(true);   // back faces — beneath the mesh
+      drawGlobeFrost(true);
+      drawGlobeNeonTouch(true);
       drawLines(sorted);
       drawDots(sorted);
-      drawGlobeFrost(false);  // front faces — on top of the mesh
+      drawGlobeNeonTouch(false);
+      drawGlobeFrost(false);
     } else {
       // Moon in front, or being dragged — always draw on top so it stays visible
-      drawGlobeFrost(true);   // back faces — beneath the mesh
+      drawGlobeFrost(true);
+      drawGlobeNeonTouch(true);
       drawLines(sorted);
       drawDots(sorted);
-      drawGlobeFrost(false);  // front faces — on top of the mesh
+      drawGlobeNeonTouch(false);
+      drawGlobeFrost(false);
       window.Moon.draw();
     }
 
@@ -446,6 +511,46 @@
       onHoverLeave() { mouseX = -9999; mouseY = -9999; mouseInside = false; },
       onRelease() { onRelease(); window.Moon.release(); },
       isDragging() { return dragVertex !== null || (window.Moon && window.Moon.isDragging()); },
+      dustAt(sx, sy, r, g, b) {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (sx - rect.left) * (W / rect.width);
+        const y = (sy - rect.top)  * (H / rect.height);
+        if (Math.hypot(x - cx, y - cy) > R + 12) return;
+        // Find the front-hemisphere polygon whose projected face center is nearest
+        let bestDist = Infinity, bOx = 0, bOy = 0, bOz = 0;
+        for (let lat = 0; lat < LAT_STEPS; lat++) {
+          for (let lon = 0; lon < LON_STEPS; lon++) {
+            const v00 = grid[lat][lon];
+            if (v00._rz >= 0) continue;
+            const v10 = grid[lat + 1][lon];
+            const v11 = grid[lat + 1][(lon + 1) % LON_STEPS];
+            const v01 = grid[lat][(lon + 1) % LON_STEPS];
+            const px = (v00.projX+v00.driftX + v10.projX+v10.driftX + v11.projX+v11.driftX + v01.projX+v01.driftX) * 0.25;
+            const py = (v00.projY+v00.driftY + v10.projY+v10.driftY + v11.projY+v11.driftY + v01.projY+v01.driftY) * 0.25;
+            const d = Math.hypot(px - x, py - y);
+            if (d < bestDist) {
+              bestDist = d;
+              bOx = (v00.x0 + v10.x0 + v11.x0 + v01.x0) * 0.25;
+              bOy = (v00.y0 + v10.y0 + v11.y0 + v01.y0) * 0.25;
+              bOz = (v00.z0 + v10.z0 + v11.z0 + v01.z0) * 0.25;
+            }
+          }
+        }
+        if (bestDist > 22) return;
+        // Normalise face centre to sphere surface (length R) so the angular
+        // distance formula in drawGlobeNeonTouch gives 0 for the same cell
+        const len = Math.sqrt(bOx*bOx + bOy*bOy + bOz*bOz) || 1;
+        const ox = bOx/len*R, oy = bOy/len*R, oz = bOz/len*R;
+        // If this polygon is already tracked, refresh its timer + color instead of stacking
+        for (const t of neonTouches) {
+          if ((t.ox*ox + t.oy*oy + t.oz*oz) / (R*R) > Math.cos(0.05)) {
+            t.startTime = Date.now(); t.r = r; t.g = g; t.b = b; return;
+          }
+        }
+        if (neonTouches.length >= 200) neonTouches.shift();
+        neonTouches.push({ ox, oy, oz, r, g, b, startTime: Date.now() });
+      },
     };
 
     canvas.addEventListener('pointermove', e => {

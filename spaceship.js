@@ -10,6 +10,7 @@
   let laserImpacts = [];
   let shipGrabbed  = false;
   let shipGrabHist = [];
+  let shipNeonTint = null;
 
   function lerpAngle(a, b, t) {
     let d = (b - a) % (Math.PI * 2);
@@ -668,6 +669,22 @@
 
     ctx.restore();
 
+    if (shipNeonTint && spaceship && !spaceship.exploding) {
+      const age = (Date.now() - shipNeonTint.startTime) / 1000;
+      const fa = age < 2.0 ? 1.0 : 1.0 - (age - 2.0) / 0.6;
+      if (fa <= 0) { shipNeonTint = null; }
+      else {
+        const gs = window.gadgetScale || 1;
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const sg = ctx.createRadialGradient(spaceship.x, spaceship.y, 0, spaceship.x, spaceship.y, 28 * gs);
+        sg.addColorStop(0, `rgba(${shipNeonTint.r},${shipNeonTint.g},${shipNeonTint.b},${(fa * 0.65).toFixed(3)})`);
+        sg.addColorStop(1, `rgba(${shipNeonTint.r},${shipNeonTint.g},${shipNeonTint.b},0)`);
+        ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(spaceship.x, spaceship.y, 28 * gs, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+
   }
 
   window.startSpaceship = function(x, y) {
@@ -753,5 +770,6 @@
       spaceship.vx = 0; spaceship.vy = 0;
     },
     isGrabbed() { return shipGrabbed; },
+    applyNeonTint(r, g, b) { shipNeonTint = { r, g, b, startTime: Date.now() }; },
   };
 })();

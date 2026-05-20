@@ -52,6 +52,7 @@
   let moonFrostPatches = [];
   let moonFreezeEnd   = 0;   // ms timestamp when freeze ends; 0 = not frozen
   let moonGlobalFrost = 0;   // 0–1 blend toward icy white for the whole moon
+  let moonNeonTint = null;
 
   let canvas, ctx;
 
@@ -148,6 +149,14 @@
       cosR: c.cosR, depth: c.depth,
     }));
 
+    let neonFa = 0, neonR = 0, neonG = 0, neonB = 0;
+    if (moonNeonTint) {
+      const age = (Date.now() - moonNeonTint.startTime) / 1000;
+      neonFa = age < 2.0 ? 1.0 : 1.0 - (age - 2.0) / 0.6;
+      if (neonFa <= 0) { moonNeonTint = null; neonFa = 0; }
+      else { neonR = moonNeonTint.r; neonG = moonNeonTint.g; neonB = moonNeonTint.b; }
+    }
+
     for (const d of MOON_DOTS) {
       const nx = d.sinP * (d.cosT * cosSA - d.sinT * sinSA);
       const ny = d.cosP;
@@ -218,6 +227,12 @@
         r = Math.round(r + moonGlobalFrost * (240 - r));
         g = Math.round(g + moonGlobalFrost * (250 - g));
         b = Math.round(b + moonGlobalFrost * (255 - b));
+      }
+
+      if (neonFa > 0) {
+        r = Math.round(r + neonFa * 0.55 * (neonR - r));
+        g = Math.round(g + neonFa * 0.55 * (neonG - g));
+        b = Math.round(b + neonFa * 0.55 * (neonB - b));
       }
 
       const alpha = Math.min(1, facing * (0.55 + lit * 0.45));
@@ -373,5 +388,6 @@
       moonDragging   = false;
       moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
     },
+    applyNeonTint(r, g, b) { moonNeonTint = { r, g, b, startTime: Date.now() }; },
   };
 })();

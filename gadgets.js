@@ -607,6 +607,18 @@
         age: 0, maxLife: 0.4 + Math.random() * 0.5,
       });
     }
+
+    window.Globe?.dustAt(x, y, nc.r, nc.g, nc.b);
+
+    const _ship = window.Spaceship?.get();
+    if (_ship && !_ship.exploding && Math.hypot(x - _ship.x, y - _ship.y) < 38) {
+      window.Spaceship.applyNeonTint(nc.r, nc.g, nc.b);
+    }
+    const _moonPos = window.getMoonScreenPos?.();
+    if (_moonPos && Math.hypot(x - _moonPos.x, y - _moonPos.y) < _moonPos.r + 12) {
+      window.Moon?.applyNeonTint(nc.r, nc.g, nc.b);
+    }
+    window.Asteroids?.applyNeonTintAt(x, y, nc.r, nc.g, nc.b);
   }
 
   window.GodHandTrail = {
