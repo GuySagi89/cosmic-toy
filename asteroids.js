@@ -17,10 +17,12 @@
   ];
 
   // Size tiers
+  const isMobile = window.innerWidth <= 768;
+  const mobileSz = isMobile ? 0.6 : 1;
   const TIERS = {
-    large:  { rMin: 54, rMax: 72, sMin: 22, sMax: 46 },
-    medium: { rMin: 27, rMax: 41, sMin: 38, sMax: 68 },
-    small:  { rMin: 13, rMax: 21, sMin: 58, sMax: 95 },
+    large:  { rMin: 54 * mobileSz, rMax: 72 * mobileSz, sMin: 22, sMax: 46 },
+    medium: { rMin: 27 * mobileSz, rMax: 41 * mobileSz, sMin: 38, sMax: 68 },
+    small:  { rMin: 13 * mobileSz, rMax: 21 * mobileSz, sMin: 58, sMax: 95 },
   };
 
   let asteroids = [];
