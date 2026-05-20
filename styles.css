@@ -622,6 +622,61 @@ body {
     drop-shadow(0 0 10px rgba(0, 200, 255, 0.50));
 }
 
+/* ── God Hand slot ── */
+#gadget-god-hand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, rgba(80, 40, 140, 0.70) 0%, rgba(6, 3, 16, 0.80) 70%);
+  box-shadow:
+    0 0 0 1px rgba(160, 120, 255, 0.32),
+    0 0 12px 3px rgba(120, 80, 220, 0.28);
+  transition: box-shadow 0.22s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #gadget-god-hand:hover {
+    box-shadow:
+      0 0 0 1px rgba(200, 160, 255, 0.62),
+      0 0 20px 6px rgba(160, 100, 255, 0.58);
+  }
+}
+
+#gadget-god-hand.active {
+  box-shadow:
+    0 0 0 2px rgba(220, 190, 255, 0.95),
+    0 0 28px 10px rgba(160, 100, 255, 0.88);
+}
+
+.gadget-hand-icon {
+  width: calc(var(--slot-size) * 0.60);
+  height: calc(var(--slot-size) * 0.60);
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(180, 140, 255, 0.65));
+  transition: filter 0.22s ease;
+}
+
+#gadget-god-hand.active .gadget-hand-icon {
+  filter: drop-shadow(0 0 8px rgba(220, 190, 255, 0.95));
+}
+
+.gadget-cursor--god-hand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, rgba(60, 30, 110, 0.45) 0%, rgba(4, 2, 12, 0.55) 70%);
+  box-shadow:
+    0 0 0 1.5px rgba(180, 140, 255, 0.72),
+    0 0 12px 4px rgba(140, 90, 242, 0.52);
+}
+
+.gadget-cursor-hand-svg {
+  width: 68%;
+  height: 68%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(200, 170, 255, 0.70));
+}
+
 /* ── Drag origin dot ── */
 .gadget-origin-dot {
   position: fixed;

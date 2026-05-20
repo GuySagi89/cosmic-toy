@@ -8,6 +8,8 @@
   let shipDebris   = [];
   let lasers       = [];
   let laserImpacts = [];
+  let shipGrabbed  = false;
+  let shipGrabHist = [];
 
   function lerpAngle(a, b, t) {
     let d = (b - a) % (Math.PI * 2);
@@ -315,6 +317,8 @@
       if (spaceship.explodeAge >= spaceship.explodeMaxAge) spaceship = null;
       return;
     }
+
+    if (shipGrabbed) return;
 
     if (spaceship.active) {
       const dx   = spaceship.targetX - spaceship.x;
@@ -708,5 +712,46 @@
       spawnShipImpact(x, y);
       spawnBounceDebris(x, y, vx, vy);
     },
+    tryGrab(sx, sy) {
+      if (!spaceship || spaceship.exploding || spaceship.swirl) return false;
+      if (Math.hypot(sx - spaceship.x, sy - spaceship.y) < 28) {
+        shipGrabbed = true;
+        spaceship.active = false;
+        spaceship.vx = 0; spaceship.vy = 0;
+        shipGrabHist = [{ x: sx, y: sy, t: performance.now() }];
+        return true;
+      }
+      return false;
+    },
+    onGrabMove(sx, sy) {
+      if (!spaceship || !shipGrabbed) return;
+      spaceship.x = sx; spaceship.y = sy;
+      spaceship.vx = 0; spaceship.vy = 0;
+      shipGrabHist.push({ x: sx, y: sy, t: performance.now() });
+      if (shipGrabHist.length > 12) shipGrabHist.shift();
+    },
+    onGrabRelease() {
+      if (!spaceship || !shipGrabbed) return;
+      const now = performance.now();
+      const recent = shipGrabHist.filter(h => now - h.t < 80);
+      let vx = 0, vy = 0;
+      if (recent.length >= 2) {
+        const f = recent[0], l = recent[recent.length - 1];
+        const dt = (l.t - f.t) / 1000;
+        if (dt > 0.005) {
+          vx = (l.x - f.x) / dt; vy = (l.y - f.y) / dt;
+          const spd = Math.hypot(vx, vy);
+          if (spd > 600) { vx = vx / spd * 600; vy = vy / spd * 600; }
+        }
+      }
+      shipGrabbed = false;
+      spaceship.vx = vx; spaceship.vy = vy;
+    },
+    onGrabCancel() {
+      if (!spaceship || !shipGrabbed) return;
+      shipGrabbed = false;
+      spaceship.vx = 0; spaceship.vy = 0;
+    },
+    isGrabbed() { return shipGrabbed; },
   };
 })();

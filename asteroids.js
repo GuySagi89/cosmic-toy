@@ -29,7 +29,6 @@
   let grabbedAsteroid = null;
   let grabOffX = 0, grabOffY = 0;
   let grabHist  = [];
-  let grabPtrId = null;
   let grabGlobeHitTime = 0;
   let grabMoonHitTime  = 0;
 
@@ -738,130 +737,98 @@
         }
       }
     },
+    tryGrab(sx, sy) {
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i];
+        if (a.dead || a.swirl) continue;
+        if (Math.hypot(sx - a.x, sy - a.y) < a.r * 0.9) {
+          grabbedAsteroid = a;
+          grabOffX = a.x - sx; grabOffY = a.y - sy;
+          grabHist = [{ x: sx, y: sy, t: performance.now() }];
+          a.vx = 0; a.vy = 0;
+          return true;
+        }
+      }
+      return false;
+    },
+    onGrabMove(sx, sy) {
+      if (!grabbedAsteroid || grabbedAsteroid.dead) { grabbedAsteroid = null; return; }
+      grabbedAsteroid.x = sx + grabOffX;
+      grabbedAsteroid.y = sy + grabOffY;
+      grabbedAsteroid.vx = 0; grabbedAsteroid.vy = 0;
+
+      const globeEl = document.getElementById('globe-canvas');
+      if (globeEl) {
+        const gr  = globeEl.getBoundingClientRect();
+        const gcx = gr.left + gr.width  / 2;
+        const gcy = gr.top  + gr.height / 2;
+        const minD = gr.width * 0.22 + grabbedAsteroid.r * 0.75;
+        const gdx = grabbedAsteroid.x - gcx, gdy = grabbedAsteroid.y - gcy;
+        const gd  = Math.hypot(gdx, gdy) || 1;
+        if (gd < minD) {
+          grabbedAsteroid.x = gcx + (gdx / gd) * minD;
+          grabbedAsteroid.y = gcy + (gdy / gd) * minD;
+          const now2 = performance.now();
+          if (now2 - grabGlobeHitTime > 350) {
+            grabGlobeHitTime = now2;
+            window.dispatchEvent(new CustomEvent('comet-globe-impact', {
+              detail: { x: grabbedAsteroid.x, y: grabbedAsteroid.y, vx: -(gdx / gd) * 90, vy: -(gdy / gd) * 90, source: 'asteroid' }
+            }));
+          }
+        }
+      }
+
+      const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+      if (moon) {
+        const minD = moon.r + grabbedAsteroid.r * 0.75;
+        const mdx = grabbedAsteroid.x - moon.x, mdy = grabbedAsteroid.y - moon.y;
+        const md  = Math.hypot(mdx, mdy) || 1;
+        if (md < minD) {
+          grabbedAsteroid.x = moon.x + (mdx / md) * minD;
+          grabbedAsteroid.y = moon.y + (mdy / md) * minD;
+          const now3 = performance.now();
+          if (now3 - grabMoonHitTime > 350) {
+            grabMoonHitTime = now3;
+            window.dispatchEvent(new CustomEvent('comet-moon-impact', {
+              detail: { x: grabbedAsteroid.x, y: grabbedAsteroid.y, vx: -(mdx / md) * 220, vy: -(mdy / md) * 220, source: 'asteroid' }
+            }));
+          }
+        }
+      }
+
+      grabHist.push({ x: sx, y: sy, t: performance.now() });
+      if (grabHist.length > 12) grabHist.shift();
+    },
+    onGrabRelease() {
+      if (!grabbedAsteroid) return;
+      const now = performance.now();
+      const recent = grabHist.filter(h => now - h.t < 80);
+      let vx = 0, vy = 0;
+      if (recent.length >= 2) {
+        const f = recent[0], l = recent[recent.length - 1];
+        const dt = (l.t - f.t) / 1000;
+        if (dt > 0.005) {
+          vx = (l.x - f.x) / dt; vy = (l.y - f.y) / dt;
+          const spd = Math.hypot(vx, vy);
+          if (spd > 600) { vx = vx / spd * 600; vy = vy / spd * 600; }
+        }
+      }
+      grabbedAsteroid.vx = vx; grabbedAsteroid.vy = vy;
+      grabbedAsteroid = null;
+    },
+    onGrabCancel() {
+      if (!grabbedAsteroid) return;
+      grabbedAsteroid.vx = 0; grabbedAsteroid.vy = 0;
+      grabbedAsteroid = null;
+    },
+    isGrabbing() { return grabbedAsteroid !== null; },
+    hoverTarget(sx, sy) {
+      for (const a of asteroids) {
+        if (a.dead || a.swirl) continue;
+        if (Math.hypot(sx - a.x, sy - a.y) < a.r * 0.9) return true;
+      }
+      return false;
+    },
   };
-
-  // ── Grab & drag ───────────────────────────────────────────────────
-
-  document.addEventListener('pointerdown', function (e) {
-    if (e.button !== 0 || grabPtrId !== null) return;
-    const inv = document.getElementById('gadget-inventory');
-    if (inv && inv.contains(e.target)) return;
-
-    for (let i = asteroids.length - 1; i >= 0; i--) {
-      const a = asteroids[i];
-      if (a.dead || a.swirl) continue;
-      if (Math.hypot(e.clientX - a.x, e.clientY - a.y) < a.r * 0.9) {
-        grabbedAsteroid = a;
-        grabOffX  = a.x - e.clientX;
-        grabOffY  = a.y - e.clientY;
-        grabHist  = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
-        grabPtrId = e.pointerId;
-        a.vx = 0; a.vy = 0;
-        document.body.style.cursor = 'grabbing';
-        e.stopPropagation();
-        return;
-      }
-    }
-  }, { capture: true });
-
-  document.addEventListener('pointermove', function (e) {
-    // Hover cursor for mouse only
-    if (e.pointerType === 'mouse' && !grabbedAsteroid) {
-      const inv = document.getElementById('gadget-inventory');
-      if (!inv || !inv.contains(e.target)) {
-        let hovering = false;
-        for (const a of asteroids) {
-          if (a.dead || a.swirl) continue;
-          if (Math.hypot(e.clientX - a.x, e.clientY - a.y) < a.r * 0.9) { hovering = true; break; }
-        }
-        document.body.style.cursor = hovering ? 'grab' : '';
-      }
-    }
-
-    if (!grabbedAsteroid || e.pointerId !== grabPtrId) return;
-    if (grabbedAsteroid.dead) { grabbedAsteroid = null; grabPtrId = null; return; }
-
-    grabbedAsteroid.x  = e.clientX + grabOffX;
-    grabbedAsteroid.y  = e.clientY + grabOffY;
-    grabbedAsteroid.vx = 0;
-    grabbedAsteroid.vy = 0;
-
-    // Constrain against globe
-    const globeEl = document.getElementById('globe-canvas');
-    if (globeEl) {
-      const gr  = globeEl.getBoundingClientRect();
-      const gcx = gr.left + gr.width  / 2;
-      const gcy = gr.top  + gr.height / 2;
-      const minD = gr.width * 0.22 + grabbedAsteroid.r * 0.75;
-      const gdx = grabbedAsteroid.x - gcx, gdy = grabbedAsteroid.y - gcy;
-      const gd  = Math.hypot(gdx, gdy) || 1;
-      if (gd < minD) {
-        grabbedAsteroid.x = gcx + (gdx / gd) * minD;
-        grabbedAsteroid.y = gcy + (gdy / gd) * minD;
-        const now2 = performance.now();
-        if (now2 - grabGlobeHitTime > 350) {
-          grabGlobeHitTime = now2;
-          window.dispatchEvent(new CustomEvent('comet-globe-impact', {
-            detail: { x: grabbedAsteroid.x, y: grabbedAsteroid.y, vx: -(gdx / gd) * 90, vy: -(gdy / gd) * 90, source: 'asteroid' }
-          }));
-        }
-      }
-    }
-
-    // Constrain against moon
-    const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
-    if (moon) {
-      const minD = moon.r + grabbedAsteroid.r * 0.75;
-      const mdx = grabbedAsteroid.x - moon.x, mdy = grabbedAsteroid.y - moon.y;
-      const md  = Math.hypot(mdx, mdy) || 1;
-      if (md < minD) {
-        grabbedAsteroid.x = moon.x + (mdx / md) * minD;
-        grabbedAsteroid.y = moon.y + (mdy / md) * minD;
-        const now3 = performance.now();
-        if (now3 - grabMoonHitTime > 350) {
-          grabMoonHitTime = now3;
-          window.dispatchEvent(new CustomEvent('comet-moon-impact', {
-            detail: { x: grabbedAsteroid.x, y: grabbedAsteroid.y, vx: -(mdx / md) * 220, vy: -(mdy / md) * 220, source: 'asteroid' }
-          }));
-        }
-      }
-    }
-
-    grabHist.push({ x: e.clientX, y: e.clientY, t: performance.now() });
-    if (grabHist.length > 12) grabHist.shift();
-  }, { capture: true });
-
-  function releaseGrab(throwVx, throwVy) {
-    if (!grabbedAsteroid) return;
-    grabbedAsteroid.vx    = throwVx;
-    grabbedAsteroid.vy    = throwVy;
-    grabbedAsteroid       = null;
-    grabPtrId             = null;
-    document.body.style.cursor = '';
-  }
-
-  document.addEventListener('pointerup', function (e) {
-    if (!grabbedAsteroid || e.pointerId !== grabPtrId) return;
-    const now    = performance.now();
-    const recent = grabHist.filter(h => now - h.t < 80);
-    let vx = 0, vy = 0;
-    if (recent.length >= 2) {
-      const f = recent[0], l = recent[recent.length - 1];
-      const dt = (l.t - f.t) / 1000;
-      if (dt > 0.005) {
-        vx = (l.x - f.x) / dt;
-        vy = (l.y - f.y) / dt;
-        const spd = Math.hypot(vx, vy);
-        if (spd > 600) { vx = vx / spd * 600; vy = vy / spd * 600; }
-      }
-    }
-    releaseGrab(vx, vy);
-    e.stopPropagation();
-  }, { capture: true });
-
-  document.addEventListener('pointercancel', function (e) {
-    if (!grabbedAsteroid || e.pointerId !== grabPtrId) return;
-    releaseGrab(0, 0);
-  }, { capture: true });
 
 })();

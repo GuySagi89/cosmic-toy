@@ -46,6 +46,7 @@
   const sortedVertices = [];
   const grid           = [];
   let   ctx;
+  let   canvas;
 
   function generateVertices() {
     const cosT = Math.cos(TILT_X);
@@ -369,7 +370,7 @@
   }
 
   function init() {
-    const canvas = document.getElementById('globe-canvas');
+    canvas = document.getElementById('globe-canvas');
     if (!canvas) return;
     ctx = canvas.getContext('2d');
     canvas.width  = W;
@@ -377,9 +378,10 @@
 
     function updateCursor() {
       if (dragVertex || window.Moon.isDragging()) return;
+      const godHandActive = window.getActiveGadget && window.getActiveGadget() === 'god-hand';
       const overMoon  = window.Moon.isOver(mouseX, mouseY);
       const overGlobe = Math.hypot(mouseX - cx, mouseY - cy) < R;
-      canvas.style.cursor = (overMoon || overGlobe) ? 'grab' : 'default';
+      canvas.style.cursor = (godHandActive && (overMoon || overGlobe)) ? 'grab' : 'default';
     }
 
     const onRelease = () => {
@@ -405,6 +407,37 @@
       dragVertex = null;
       if (!mouseInside) { mouseX = -9999; mouseY = -9999; }
       updateCursor();
+    };
+
+    window.Globe = {
+      tryGrab(sx, sy, pointerType) {
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.max(0, Math.min(W, (sx - rect.left) * (W / rect.width)));
+        const y = Math.max(0, Math.min(H, (sy - rect.top)  * (H / rect.height)));
+        mouseX = x; mouseY = y; mouseInside = true;
+        if (window.Moon.tryGrab(x, y)) return 'moon';
+        const effR = pointerType === 'touch' ? 50 : GRAB_RADIUS;
+        let nearest = null, bestDist = effR;
+        for (let i = 0; i < vertices.length; i++) {
+          const v = vertices[i];
+          if (v._rz >= 0) continue;
+          const d = Math.hypot(x - v.projX, y - v.projY);
+          if (d < bestDist) { bestDist = d; nearest = v; }
+        }
+        if (nearest) { dragVertex = nearest; computeDragWeights(nearest); return 'globe'; }
+        return null;
+      },
+      onMove(sx, sy) {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.max(0, Math.min(W, (sx - rect.left) * (W / rect.width)));
+        const y = Math.max(0, Math.min(H, (sy - rect.top)  * (H / rect.height)));
+        if (window.Moon.isDragging()) window.Moon.drag(x, y);
+        mouseX = x; mouseY = y;
+      },
+      onRelease() { onRelease(); window.Moon.release(); },
+      isDragging() { return dragVertex !== null || (window.Moon && window.Moon.isDragging()); },
     };
 
     canvas.addEventListener('pointermove', e => {
@@ -433,6 +466,7 @@
     });
 
     canvas.addEventListener('pointerdown', e => {
+      if (!window.getActiveGadget || window.getActiveGadget() !== 'god-hand') return;
       const raw = canvasCoords(e, canvas);
       const x = Math.max(0, Math.min(W, raw.x));
       const y = Math.max(0, Math.min(H, raw.y));

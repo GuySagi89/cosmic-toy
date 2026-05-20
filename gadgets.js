@@ -24,6 +24,9 @@
 
   const SHIP_SVG     = '<svg class="gadget-cursor-ship-svg" viewBox="-13 -16 26 30" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-15 -12,7 -5,2 0,11 5,2 12,7" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="0" cy="-6" rx="2.5" ry="4.5" fill="#98dcff" fill-opacity="0.90" stroke="#c8eeff" stroke-width="0.7" stroke-opacity="0.55"/></svg>';
   const ASTEROID_SVG = '<svg class="gadget-cursor-asteroid-svg" viewBox="-20 -20 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="0,-18 10,-13 17,-4 15,9 6,17 -7,16 -16,7 -15,-6 -8,-16" fill="rgba(0,28,32,0.85)" stroke="#00f5ff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="3" cy="-4" r="2.5" fill="rgba(0,245,255,0.12)" stroke="#00f5ff" stroke-width="0.8"/></svg>';
+  const HAND_OPEN_SVG = '<svg class="gadget-cursor-hand-svg" viewBox="-13 -21 26 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="-10" y="-21" width="4" height="13" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="-5" y="-23" width="4" height="15" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="1" y="-21" width="4" height="13" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="6" y="-17" width="4" height="10" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/><rect x="-13" y="-9" width="6.5" height="4" rx="2" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" transform="rotate(15 -13 -9)"/><path d="M -11,-8 L 10,-8 Q 12,-8 12,8 Q 12,18 6,18 Q 0,18 -4,18 Q -12,18 -12,8 Q -12,-8 -11,-8 Z" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/></svg>';
+  const HAND_GRAB_SVG = '<svg class="gadget-cursor-hand-svg" viewBox="-13 -14 26 34" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M -11,-13 Q -8.5,-15 -6,-13 Q -3,-15 0,-13 Q 3,-15 6,-13 Q 8.5,-15 11,-13 L 12,-1 L -12,-1 Z" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><path d="M -12,-2 Q -16,-1 -16,4 Q -16,9 -12,10 Z" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3" stroke-linejoin="round"/><rect x="-12" y="-2" width="24" height="16" rx="5" fill="#6848b8" fill-opacity="0.93" stroke="#c0a8ff" stroke-width="1.3"/></svg>';
+  let godHandGrabType = null;
 
   function moveCursor(x, y) {
     if (!cursorEl) return;
@@ -190,6 +193,11 @@
       if (activeGadget === 'spaceship') {
         if (cursorEl) cursorEl.classList.remove('pressing');
         window.releaseSpaceship && window.releaseSpaceship();
+      } else if (activeGadget === 'god-hand' && godHandGrabType) {
+        if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabCancel();
+        else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabCancel();
+        else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
+        godHandGrabType = null;
       }
       hideDragFeedback();
     }
@@ -206,6 +214,7 @@
       cursorEl.className = `gadget-cursor gadget-cursor--${activeGadget}`;
       if (activeGadget === 'spaceship') cursorEl.innerHTML = SHIP_SVG;
       if (activeGadget === 'asteroid')  cursorEl.innerHTML = ASTEROID_SVG;
+      if (activeGadget === 'god-hand')  cursorEl.innerHTML = HAND_OPEN_SVG;
       if (activeGadget === 'meteor-shower') {
         const ring = document.createElement('div');
         ring.className = 'cooldown-ring';
@@ -230,6 +239,8 @@
     }
   }
 
+  window.getActiveGadget = () => activeGadget;
+
   // Track last real pointer type to avoid treating compat mouse events as genuine mouse input
   document.addEventListener('pointerdown', e => { lastPointerType = e.pointerType; }, { capture: true });
 
@@ -249,6 +260,12 @@
       if (activeGadget === 'spaceship') {
         if (cursorEl) cursorEl.classList.remove('pressing');
         window.releaseSpaceship && window.releaseSpaceship();
+      } else if (activeGadget === 'god-hand' && godHandGrabType) {
+        if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabRelease();
+        else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabRelease();
+        else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
+        godHandGrabType = null;
+        if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
       }
     }
 
@@ -295,6 +312,21 @@
       if (!window.MeteorShower || window.MeteorShower.isReady()) {
         showDragOrigin(dragStartX, dragStartY, 'meteor-shower');
       }
+    } else if (activeGadget === 'god-hand') {
+      godHandGrabType = null;
+      if (window.Asteroids && window.Asteroids.tryGrab(e.clientX, e.clientY)) {
+        godHandGrabType = 'asteroid';
+      } else if (window.Spaceship && window.Spaceship.tryGrab(e.clientX, e.clientY)) {
+        godHandGrabType = 'spaceship';
+      } else if (window.Globe && window.Globe.tryGrab(e.clientX, e.clientY, e.pointerType)) {
+        godHandGrabType = 'globe';
+      }
+      if (godHandGrabType) {
+        if (cursorEl) cursorEl.innerHTML = HAND_GRAB_SVG;
+        overlay.setPointerCapture(e.pointerId);
+      } else {
+        isDragging = false;
+      }
     }
   }
 
@@ -333,6 +365,10 @@
         showDragOrigin(e.clientX, e.clientY, 'meteor-shower');
       }
       updateDragFeedback(e.clientX, e.clientY);
+    } else if (activeGadget === 'god-hand' && godHandGrabType) {
+      if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabMove(e.clientX, e.clientY);
+      else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabMove(e.clientX, e.clientY);
+      else if (godHandGrabType === 'globe')     window.Globe?.onMove(e.clientX, e.clientY);
     }
   }
 
@@ -401,6 +437,14 @@
         window.spawnMeteorShower(e.clientX, e.clientY, 0, 500);
       }
       spawnThrowParticles(e.clientX, e.clientY, 'meteor-shower');
+    } else if (activeGadget === 'god-hand') {
+      if (godHandGrabType) {
+        if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabRelease();
+        else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabRelease();
+        else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
+        godHandGrabType = null;
+        if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
+      }
     }
   }
 
@@ -415,6 +459,12 @@
     if (activeGadget === 'spaceship') {
       if (cursorEl) cursorEl.classList.remove('pressing');
       window.releaseSpaceship && window.releaseSpaceship();
+    } else if (activeGadget === 'god-hand' && godHandGrabType) {
+      if (godHandGrabType === 'asteroid')       window.Asteroids?.onGrabCancel();
+      else if (godHandGrabType === 'spaceship') window.Spaceship?.onGrabCancel();
+      else if (godHandGrabType === 'globe')     window.Globe?.onRelease();
+      godHandGrabType = null;
+      if (cursorEl) cursorEl.innerHTML = HAND_OPEN_SVG;
     }
   }
 
