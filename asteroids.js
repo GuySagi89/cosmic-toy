@@ -18,9 +18,9 @@
 
   // Size tiers
   const TIERS = {
-    large:  { rMin: 54, rMax: 72, hp: 3, sMin: 22, sMax: 46, splits: 'medium', splitN: 2    },
-    medium: { rMin: 27, rMax: 41, hp: 2, sMin: 38, sMax: 68, splits: 'small',  splitN: [2,3] },
-    small:  { rMin: 13, rMax: 21, hp: 1, sMin: 58, sMax: 95, splits: null                   },
+    large:  { rMin: 54, rMax: 72, sMin: 22, sMax: 46 },
+    medium: { rMin: 27, rMax: 41, sMin: 38, sMax: 68 },
+    small:  { rMin: 13, rMax: 21, sMin: 58, sMax: 95 },
   };
 
   let asteroids = [];
@@ -141,7 +141,6 @@
       eulerZ: Math.random() * Math.PI * 2,
       eulerSpd,
       tier, r,
-      hp: t.hp, maxHp: t.hp,
       shape3D,
       // 2D silhouette (computed each frame) — needed so we can clip/fill the body
       projected: new Array(shape3D.verts.length),
@@ -173,7 +172,7 @@
     return createAsteroid(x, y, tier, (dx / d) * spd, (dy / d) * spd);
   }
 
-  // ── Split & damage ────────────────────────────────────────────────
+  // ── Hit effects ───────────────────────────────────────────────────
 
   function spawnSplitFlash(a) {
     const nc = NEON[a.ci];
@@ -207,49 +206,6 @@
         color: nc.hex,
       });
     }
-  }
-
-  function splitAsteroid(a) {
-    const t = TIERS[a.tier];
-    if (!t.splits) return;
-
-    const count = Array.isArray(t.splitN)
-      ? t.splitN[0] + Math.floor(Math.random() * (t.splitN[1] - t.splitN[0] + 1))
-      : t.splitN;
-
-    const parentAng = Math.atan2(a.vy, a.vx);
-    const ct        = TIERS[t.splits];
-    const spread    = count === 2 ? 0.65 : 0.45;
-
-    for (let i = 0; i < count; i++) {
-      const frac = count > 1 ? (i / (count - 1)) - 0.5 : 0;
-      const ang  = parentAng + frac * spread * 2 * Math.PI + (Math.random() - 0.5) * 0.5;
-      const spd  = rng(ct.sMin, ct.sMax);
-      const vx   = Math.cos(ang) * spd;
-      const vy   = Math.sin(ang) * spd;
-      const off  = a.r * 0.55;
-      asteroids.push(createAsteroid(
-        a.x + Math.cos(ang) * off,
-        a.y + Math.sin(ang) * off,
-        t.splits, vx, vy
-      ));
-    }
-
-    spawnSplitFlash(a);
-  }
-
-  // Returns true if the asteroid was hit (and possibly destroyed)
-  function damageAsteroid(idx, dmg, ix, iy) {
-    const a = asteroids[idx];
-    if (!a || a.dead || a.swirl) return false;
-    a.hp      -= dmg;
-    a.hitFlash = 0.22;
-    spawnHitSparks(a, ix ?? a.x, iy ?? a.y);
-    if (a.hp <= 0) {
-      a.dead = true;
-      splitAsteroid(a);
-    }
-    return true;
   }
 
   // ── Update ────────────────────────────────────────────────────────
@@ -295,8 +251,8 @@
           if (ai.bounceCD <= 0 && aj.bounceCD <= 0) {
             ai.bounceCD = 0.5;
             aj.bounceCD = 0.5;
-            damageAsteroid(i, 1, ai.x, ai.y);
-            damageAsteroid(j, 1, aj.x, aj.y);
+            spawnHitSparks(ai, ai.x, ai.y); ai.hitFlash = 0.22;
+            spawnHitSparks(aj, aj.x, aj.y); aj.hitFlash = 0.22;
           }
         }
       }
@@ -373,8 +329,8 @@
             window.dispatchEvent(new CustomEvent('comet-globe-impact', {
               detail: { x: a.x, y: a.y, vx: -nx * 300, vy: -ny * 300, source: 'asteroid' }
             }));
-            damageAsteroid(i, 1, a.x, a.y);
-            if (a.dead) continue;
+            spawnHitSparks(a, a.x, a.y);
+            a.hitFlash = 0.22;
           }
         }
       }
@@ -395,8 +351,8 @@
             window.dispatchEvent(new CustomEvent('comet-moon-impact', {
               detail: { x: a.x, y: a.y, vx: -nx * 250, vy: -ny * 250, source: 'asteroid' }
             }));
-            damageAsteroid(i, 1, a.x, a.y);
-            if (a.dead) continue;
+            spawnHitSparks(a, a.x, a.y);
+            a.hitFlash = 0.22;
           }
         }
       }
@@ -421,9 +377,9 @@
           }
           if (a.bounceCD <= 0) {
             a.bounceCD = 0.6;
-            window.Spaceship.hit(ship.x, ship.y, a.vx, a.vy, 2);
-            damageAsteroid(i, 1, a.x, a.y);
-            if (a.dead) continue;
+            window.Spaceship.hit(ship.x, ship.y, a.vx, a.vy);
+            spawnHitSparks(a, a.x, a.y);
+            a.hitFlash = 0.22;
           }
         }
       }
@@ -656,14 +612,14 @@
 
   // ── Public API ────────────────────────────────────────────────────
 
-  function checkHit(x, y, hitR, dmg) {
+  function checkHit(x, y, hitR) {
     hitR = hitR ?? 10;
-    dmg  = dmg  ?? 1;
     for (let i = 0; i < asteroids.length; i++) {
       const a = asteroids[i];
       if (a.dead || a.swirl) continue;
       if (Math.hypot(x - a.x, y - a.y) < a.r + hitR) {
-        damageAsteroid(i, dmg, x, y);
+        spawnHitSparks(a, x, y);
+        a.hitFlash = 0.22;
         return true;
       }
     }
@@ -673,7 +629,10 @@
   window.Asteroids = {
     update,
     draw,
-    spawnAt(x, y, tier) { asteroids.push(createAsteroid(x, y, tier || 'large')); },
+    spawnAt(x, y, tier) {
+      const tiers = ['small', 'medium', 'large'];
+      asteroids.push(createAsteroid(x, y, tier || tiers[Math.floor(Math.random() * tiers.length)]));
+    },
     checkHit,
     getAll: () => asteroids,
     bhExplode(cx, cy, pullR) {
@@ -684,7 +643,8 @@
           spawnSplitFlash(a);
           a.dead = true;
         } else {
-          damageAsteroid(i, 1, a.x, a.y);
+          spawnHitSparks(a, a.x, a.y);
+          a.hitFlash = 0.22;
         }
       }
     },

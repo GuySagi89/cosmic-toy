@@ -384,8 +384,6 @@
             spawnShipImpact(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-globe-impact',
               { detail: { x: spaceship.x, y: spaceship.y, vx: inVx, vy: inVy, source: 'spaceship' } }));
-            spaceship.hits++;
-            if (spaceship.hits >= 10) triggerShipExplosion();
           }
           spaceship.bounceCD = 0.5;
         } else if (dot < 0) {
@@ -413,8 +411,6 @@
             spawnShipImpact(spaceship.x, spaceship.y);
             window.dispatchEvent(new CustomEvent('comet-moon-impact',
               { detail: { vx: inVx, vy: inVy, source: 'spaceship' } }));
-            spaceship.hits++;
-            if (spaceship.hits >= 10) triggerShipExplosion();
           }
           spaceship.bounceCD = 0.5;
         } else if (dot < 0) {
@@ -612,54 +608,16 @@
       }
     }
 
-    const hits    = spaceship.hits;
-    const hitFrac = Math.min(hits / 9, 1);
-    const now     = Date.now();
-    const cl = (a, b, t) => Math.round(a + (b - a) * t);
-    let fl = 0, warnFreq = 0;
-    if (hits >= 7) {
-      warnFreq = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 7), 2)];
-      fl = (Math.sin(now / 1000 * warnFreq * Math.PI * 2) + 1) / 2;
-    }
-    const topR = cl(cl(192, 255, hitFrac), 255, fl * 0.92);
-    const topG = cl(cl(162,  65, hitFrac),  15, fl * 0.92);
-    const topB = cl(cl(255,  65, hitFrac),  15, fl * 0.92);
-    const midR = cl(cl(126, 215, hitFrac), 255, fl * 0.92);
-    const midG = cl(cl( 90,  35, hitFrac),   5, fl * 0.92);
-    const midB = cl(cl(228,  35, hitFrac),   5, fl * 0.92);
-    const botR = cl(cl( 78, 170, hitFrac), 220, fl * 0.92);
-    const botG = cl(cl( 55,  18, hitFrac),   2, fl * 0.92);
-    const botB = cl(cl(180,  18, hitFrac),   2, fl * 0.92);
-    const glR  = cl(cl(158, 255, hitFrac), 255, fl);
-    const glG  = cl(cl(118,  45, hitFrac),   0, fl);
-    const glB  = cl(cl(255,  45, hitFrac),   0, fl);
-    const stR  = cl(220, 255, hitFrac);
-    const stG  = cl(208, 140, hitFrac);
-    const stB  = cl(255, 140, hitFrac);
+    const topR = 192, topG = 162, topB = 255;
+    const midR = 126, midG =  90, midB = 228;
+    const botR =  78, botG =  55, botB = 180;
+    const glR  = 158, glG  = 118, glB  = 255;
+    const stR  = 220, stG  = 208, stB  = 255;
 
     const gs = window.gadgetScale || 1;
     ctx.globalAlpha = spaceship.alpha;
     ctx.translate(spaceship.x, spaceship.y);
     ctx.scale(gs, gs);
-
-    if (hits >= 7 && !spaceship.swirl) {
-      const period   = 1000 / warnFreq;
-      const maxRingR = 55 + (hits - 7) * 14;
-      ctx.save();
-      for (let ri = 0; ri < 2; ri++) {
-        const phase  = ((now + ri * period * 0.5) % period) / period;
-        const ringR  = 14 + phase * maxRingR;
-        const rAlpha = (1 - phase) * (0.45 + fl * 0.45);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 20, 20, ${rAlpha})`;
-        ctx.lineWidth   = (1 - phase) * 5 + 0.5;
-        ctx.shadowColor = 'rgba(255, 0, 0, 1)';
-        ctx.shadowBlur  = 18;
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
 
     ctx.rotate(spaceship.angle);
 
@@ -669,7 +627,7 @@
     }
 
     ctx.shadowColor = `rgba(${glR}, ${glG}, ${glB}, 0.9)`;
-    ctx.shadowBlur  = 14 + (hits >= 7 ? fl * 28 : 0);
+    ctx.shadowBlur  = 14;
 
     ctx.beginPath();
     ctx.moveTo( 0, -15);
@@ -706,57 +664,11 @@
 
     ctx.restore();
 
-    // Health bar — screen-aligned, below the ship
-    if (!spaceship.exploding && !spaceship.swirl && spaceship.alpha > 0.05) {
-      const health = Math.max(0, (10 - spaceship.hits) / 10);
-      const gs2    = window.gadgetScale || 1;
-      const BAR_W  = 36 * gs2, BAR_H = 4 * gs2;
-      const bx     = spaceship.x - BAR_W / 2;
-      const by     = spaceship.y + 22 * gs2;
-
-      ctx.save();
-      ctx.globalAlpha = spaceship.alpha * 0.85;
-
-      // Dark background track
-      ctx.fillStyle = 'rgba(15, 5, 40, 0.72)';
-      ctx.fillRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
-
-      // Fill color: ship purple → orange → red as damage increases
-      if (health > 0) {
-        const dmg = 1 - health;
-        let fr, fg, fb;
-        if (dmg < 0.5) {
-          fr = Math.round(150 + dmg * 2 * 105);
-          fg = Math.round( 90 + dmg * 2 *  50);
-          fb = Math.round(255 - dmg * 2 * 215);
-        } else {
-          fr = 255;
-          fg = Math.round(140 - (dmg - 0.5) * 2 * 140);
-          fb = Math.round( 40 - (dmg - 0.5) * 2 *  40);
-        }
-
-        let barAlpha = 0.92;
-        if (health <= 0.3 && hits >= 7) {
-          const pf = [0.7, 1.3, 2.2][Math.min(Math.floor(hits - 7), 2)];
-          barAlpha  = 0.60 + ((Math.sin(Date.now() / 1000 * pf * Math.PI * 2) + 1) / 2) * 0.40;
-        }
-
-        ctx.fillStyle = `rgba(${fr}, ${fg}, ${fb}, ${barAlpha})`;
-        ctx.fillRect(bx, by, BAR_W * health, BAR_H);
-      }
-
-      // Subtle border
-      ctx.strokeStyle = 'rgba(140, 90, 215, 0.45)';
-      ctx.lineWidth   = 0.8;
-      ctx.strokeRect(bx - 1, by - 1, BAR_W + 2, BAR_H + 2);
-
-      ctx.restore();
-    }
   }
 
   window.startSpaceship = function(x, y) {
     if (!spaceship) {
-      spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0, hits: 0 };
+      spaceship = { x, y, targetX: x, targetY: y, vx: 0, vy: 0, angle: 0, active: true, alpha: 1, emitAccum: 0, bounceCD: 0 };
     } else if (!spaceship.exploding && !spaceship.swirl) {
       spaceship.targetX = x;
       spaceship.targetY = y;
@@ -791,12 +703,10 @@
     draw:             drawSpaceship,
     get:              () => spaceship,
     triggerExplosion: triggerShipExplosion,
-    hit(x, y, vx, vy, damage) {
+    hit(x, y, vx, vy) {
       if (!spaceship || spaceship.exploding || spaceship.swirl) return;
-      spaceship.hits += damage;
       spawnShipImpact(x, y);
       spawnBounceDebris(x, y, vx, vy);
-      if (spaceship.hits >= 10) triggerShipExplosion();
     },
   };
 })();
