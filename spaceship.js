@@ -270,8 +270,61 @@
         tractorTarget = null;
         tractorActive = false;
       } else {
-        tractorTarget.x  = spaceship.x + tractorOffsetX;
-        tractorTarget.y  = spaceship.y + tractorOffsetY;
+        const wantX = spaceship.x + tractorOffsetX;
+        const wantY = spaceship.y + tractorOffsetY;
+        let clampX  = wantX;
+        let clampY  = wantY;
+        const ar    = tractorTarget.r;
+
+        // Clamp asteroid away from globe
+        const globeEl = document.getElementById('globe-canvas');
+        if (globeEl) {
+          const gr    = globeEl.getBoundingClientRect();
+          const gcx   = gr.left + gr.width  / 2;
+          const gcy   = gr.top  + gr.height / 2;
+          const minD  = gr.width * 0.22 + ar * 0.75;
+          const dx    = clampX - gcx, dy = clampY - gcy;
+          const dist  = Math.hypot(dx, dy);
+          if (dist < minD) {
+            const nx = dx / (dist || 1), ny = dy / (dist || 1);
+            clampX = gcx + nx * minD;
+            clampY = gcy + ny * minD;
+          }
+        }
+
+        // Clamp asteroid away from moon
+        const moon = window.getMoonScreenPos ? window.getMoonScreenPos() : null;
+        if (moon) {
+          const minD = moon.r + ar * 0.75;
+          const dx   = clampX - moon.x, dy = clampY - moon.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < minD) {
+            const nx = dx / (dist || 1), ny = dy / (dist || 1);
+            clampX = moon.x + nx * minD;
+            clampY = moon.y + ny * minD;
+          }
+        }
+
+        // Clamp asteroid inside screen edges
+        if (clampX - ar < 0)              clampX = ar;
+        if (clampX + ar > canvas.width)   clampX = canvas.width  - ar;
+        if (clampY - ar < 0)              clampY = ar;
+        if (clampY + ar > canvas.height)  clampY = canvas.height - ar;
+
+        // If asteroid was pushed back beyond threshold, lock the ship in place
+        const clampDX = clampX - wantX;
+        const clampDY = clampY - wantY;
+        if (Math.hypot(clampDX, clampDY) > 2) {
+          spaceship.x += clampDX;
+          spaceship.y += clampDY;
+          spaceship.vx = 0;
+          spaceship.vy = 0;
+          spaceship.targetX = spaceship.x;
+          spaceship.targetY = spaceship.y;
+        }
+
+        tractorTarget.x  = clampX;
+        tractorTarget.y  = clampY;
         tractorTarget.vx = 0;
         tractorTarget.vy = 0;
       }
