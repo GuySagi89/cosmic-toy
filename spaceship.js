@@ -32,14 +32,16 @@
     const cs = Math.cos(spread), ss = Math.sin(spread);
     const speed   = 32 + Math.random() * 35;
     const maxLife = 0.50 + Math.random() * 0.35;
-    window.smokeParticles.push({
+    const particle = {
       x: rx, y: ry,
       vx: (bx * cs - by * ss) * speed + spaceship.vx * 0.12,
       vy: (bx * ss + by * cs) * speed + spaceship.vy * 0.12,
       life: maxLife, maxLife,
       r: 2.5 + Math.random() * 2.5,
       core: Math.random() < 0.45,
-    });
+    };
+    if (shipNeonTint) { particle.nr = shipNeonTint.r; particle.ng = shipNeonTint.g; particle.nb = shipNeonTint.b; }
+    window.smokeParticles.push(particle);
   }
 
   function spawnBounceDebris(x, y, vx, vy) {

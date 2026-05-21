@@ -316,7 +316,14 @@
       const alpha = (p.life / p.maxLife) * (p.core ? 0.78 : 0.48);
       const r     = Math.max(0.01, p.r * (1 + frac * 2.8));
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-      if (p.comet) {
+      if (p.nr != null) {
+        const dr = Math.round(p.nr * 0.55 + 255 * 0.45);
+        const dg = Math.round(p.ng * 0.55 + 255 * 0.45);
+        const db = Math.round(p.nb * 0.55 + 255 * 0.45);
+        g.addColorStop(0,   `rgba(${dr}, ${dg}, ${db}, ${alpha})`);
+        g.addColorStop(0.4, `rgba(${p.nr}, ${p.ng}, ${p.nb}, ${alpha * 0.45})`);
+        g.addColorStop(1,   `rgba(${Math.round(p.nr * 0.3)}, ${Math.round(p.ng * 0.3)}, ${Math.round(p.nb * 0.3)}, 0)`);
+      } else if (p.comet) {
         g.addColorStop(0,   `rgba(180, 240, 255, ${alpha})`);
         g.addColorStop(0.4, `rgba(80,  180, 255, ${alpha * 0.45})`);
         g.addColorStop(1,   'rgba(20, 80, 200, 0)');
