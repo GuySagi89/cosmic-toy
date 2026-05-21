@@ -151,10 +151,8 @@
 
     let neonFa = 0, neonR = 0, neonG = 0, neonB = 0;
     if (moonNeonTint) {
-      const age = (Date.now() - moonNeonTint.startTime) / 1000;
-      neonFa = age < 2.0 ? 1.0 : 1.0 - (age - 2.0) / 0.6;
-      if (neonFa <= 0) { moonNeonTint = null; neonFa = 0; }
-      else { neonR = moonNeonTint.r; neonG = moonNeonTint.g; neonB = moonNeonTint.b; }
+      neonFa = 1.0;
+      neonR = moonNeonTint.r; neonG = moonNeonTint.g; neonB = moonNeonTint.b;
     }
 
     for (const d of MOON_DOTS) {
@@ -388,6 +386,6 @@
       moonDragging   = false;
       moonOrbitSpeed = Math.max(-0.22, Math.min(0.22, moonDragVel * 2.0));
     },
-    applyNeonTint(r, g, b) { moonNeonTint = { r, g, b, startTime: Date.now() }; },
+    applyNeonTint(r, g, b) { moonNeonTint = { r, g, b }; },
   };
 })();

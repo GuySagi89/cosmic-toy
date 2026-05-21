@@ -315,16 +315,9 @@
   }
 
 
-  const TOUCH_HOLD     = 2.0;   // seconds at full color
-  const TOUCH_FADE     = 0.6;   // seconds to fade out after hold
-  const TOUCH_LIFETIME = TOUCH_HOLD + TOUCH_FADE;
   const TOUCH_R        = 0.22;  // ~12° angular radius — covers the target polygon + soft edge
 
   function drawGlobeNeonTouch(backOnly) {
-    const now = Date.now();
-    for (let i = neonTouches.length - 1; i >= 0; i--) {
-      if ((now - neonTouches[i].startTime) / 1000 >= TOUCH_LIFETIME) neonTouches.splice(i, 1);
-    }
     if (!neonTouches.length) return;
 
     const cosR = Math.cos(rotY);
@@ -350,9 +343,7 @@
 
         let maxW = 0, tr = 0, tg = 0, tb = 0;
         for (const t of neonTouches) {
-          const age = (now - t.startTime) / 1000;
-          const fa  = age < TOUCH_HOLD ? 1.0 : 1.0 - (age - TOUCH_HOLD) / TOUCH_FADE;
-          if (fa <= 0) continue;
+          const fa = 1.0;
           // t.ox/oy/oz are normalised to length R, so dot / (R * fcLen) = cos(angle)
           const dot   = (t.ox * fcx + t.oy * fcy + t.oz * fcz) / (R * fcLen);
           const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
@@ -549,7 +540,7 @@
           }
         }
         if (neonTouches.length >= 200) neonTouches.shift();
-        neonTouches.push({ ox, oy, oz, r, g, b, startTime: Date.now() });
+        neonTouches.push({ ox, oy, oz, r, g, b });
       },
     };
 
